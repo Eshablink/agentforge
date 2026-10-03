@@ -1,19 +1,18 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from app.core.settings import get_settings
 from app.db.session import SessionLocal
 from app.main import app
 from app.models.conversation import Conversation, Message
 from app.models.document import Document, DocumentChunk
-from app.models.user import User
+from app.models.user import AuthSession, User
 from app.services.auth_service import _verify_password
-from app.core.settings import get_settings
 
 client = TestClient(app)
 PASSWORD = "a-very-long-test-password"
@@ -38,20 +37,15 @@ def test_registration_login_password_hash_and_logout_revocation() -> None:
         user = db.get(User, user_id)
         assert user is not None and user.password_hash != PASSWORD
         assert _verify_password(PASSWORD, user.password_hash)
-    finally:
-        db.close()
-    assert client.post("/auth/login", json={"email": email, "password": "incorrect-long-password"}).status_code == 401
-    login = client.post("/auth/login", json={"email": email, "password": PASSWORD})
-    assert login.status_code == 200
-    token = login.json()["access_token"]
-    db = SessionLocal()
-    try:
-        from app.models.user import AuthSession
-        row = db.scalar(select(AuthSession).where(AuthSession.user_id == user_id))
+        login = client.post("/auth/login", json={"email": email, "password": PASSWORD})
+        assert login.status_code == 200
+        token = login.json()["access_token"]
+        row = db.scalar(select(AuthSession).where(AuthSession.user_id == user_id).order_by(AuthSession.created_at.desc()))
         assert row is not None and row.token_hash != token
         assert row.expires_at > datetime.now(timezone.utc)
     finally:
         db.close()
+    assert client.post("/auth/login", json={"email": email, "password": "incorrect-long-password"}).status_code == 401
     headers = {"Authorization": f"Bearer {token}"}
     assert client.get("/conversations", headers=headers).status_code == 200
     assert client.post("/auth/logout", headers=headers).status_code == 204
@@ -74,8 +68,7 @@ def test_protected_routes_require_auth_and_conversations_enforce_owner() -> None
 def test_document_routes_are_owner_scoped_and_legacy_routes_are_unowned_only() -> None:
     owner_headers, _ = _register_login(f"doc-owner-{uuid.uuid4().hex}@example.com")
     other_headers, _ = _register_login(f"doc-other-{uuid.uuid4().hex}@example.com")
-    content = b"private document for account owner"
-    upload = client.post("/documents/me", files={"file": ("private.txt", content, "text/plain")}, headers=owner_headers)
+    upload = client.post("/documents/me", files={"file": ("private.txt", b"private document for account owner", "text/plain")}, headers=owner_headers)
     assert upload.status_code == 201
     assert [row["filename"] for row in client.get("/documents/me", headers=owner_headers).json()] == ["private.txt"]
     assert client.get("/documents/me", headers=other_headers).json() == []
@@ -90,15 +83,12 @@ def test_user_owned_conversation_memory_is_bounded_and_isolated(monkeypatch) -> 
     owner_headers, _ = _register_login(f"memory-owner-{uuid.uuid4().hex}@example.com")
     other_headers, _ = _register_login(f"memory-other-{uuid.uuid4().hex}@example.com")
     created = client.post("/conversations", json={"title": "memory"}, headers=owner_headers)
-    cid = created.json()["id"]
-    conversation_id = uuid.UUID(cid)
+    conversation_id = uuid.UUID(created.json()["id"])
     db = SessionLocal()
     try:
-        db.add_all([
-            Message(conversation_id=conversation_id, role="user", content="old context"),
-            Message(conversation_id=conversation_id, role="assistant", content="old reply"),
-        ])
+        db.add_all([Message(conversation_id=conversation_id, role="user", content="old context"), Message(conversation_id=conversation_id, role="assistant", content="old reply")])
         db.commit()
+        owner = db.scalar(select(User).where(User.email == owner_headers["Authorization"].split(":", 1)[1]))
     finally:
         db.close()
 
@@ -113,11 +103,11 @@ def test_user_owned_conversation_memory_is_bounded_and_isolated(monkeypatch) -> 
             return AgentResult(answer="ok", answer_kind="DIRECT", sources=[], tools_used=[], events=[AgentEvent(event="finished")])
     monkeypatch.setattr(platform, "_service", lambda db: FakeAgent())
     try:
-        sent = client.post(f"/conversations/{cid}/messages", json={"content": "follow-up"}, headers=owner_headers)
+        sent = client.post(f"/conversations/{conversation_id}/messages", json={"content": "follow-up"}, headers=owner_headers)
     finally:
         monkeypatch.setattr(platform, "_service", original)
     assert sent.status_code == 200
     assert "old context" in observed["context"]
     assert "follow-up" not in observed["context"]
-    assert observed["user_id"] == uuid.UUID(created.json().get("user_id", str(observed["user_id"]))) if observed.get("user_id") else False
-    assert client.get(f"/conversations/{cid}", headers=other_headers).status_code == 404
+    assert observed["user_id"] is not None
+    assert client.get(f"/conversations/{conversation_id}", headers=other_headers).status_code == 404
