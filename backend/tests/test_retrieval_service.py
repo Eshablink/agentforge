@@ -5,18 +5,22 @@ import uuid
 from app.core.settings import get_settings
 from app.db.session import SessionLocal
 from app.models.document import Document, DocumentChunk
+from app.models.user import User
 from app.services.embedding_service import EmbeddingService
 from app.services.retrieval_service import RetrievalService
+
+
+def _make_user(session, user_id: uuid.UUID, suffix: str) -> None:
+    session.add(User(id=user_id, email=f"{suffix}-{user_id.hex}@example.com", password_hash="test-hash", is_active=True))
+    session.flush()
 
 
 def test_retrieval_returns_relevant_chunks(monkeypatch) -> None:
     settings = get_settings()
     session = SessionLocal()
-    owner_id = uuid.uuid4()
-    doc1_id = uuid.uuid4()
-    doc2_id = uuid.uuid4()
-
+    owner_id, doc1_id, doc2_id = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
     try:
+        _make_user(session, owner_id, "owner")
         session.add_all([
             Document(id=doc1_id, user_id=owner_id, filename="relevant.txt", content_type="text/plain", metadata_json={}, status="processed"),
             Document(id=doc2_id, user_id=owner_id, filename="other.txt", content_type="text/plain", metadata_json={}, status="processed"),
@@ -44,6 +48,8 @@ def test_retrieval_excludes_other_users_documents(monkeypatch) -> None:
     session = SessionLocal()
     owner_id, foreign_id = uuid.uuid4(), uuid.uuid4()
     try:
+        _make_user(session, owner_id, "owner")
+        _make_user(session, foreign_id, "foreign")
         own_doc = Document(id=uuid.uuid4(), user_id=owner_id, filename="own.txt", content_type="text/plain", metadata_json={}, status="processed")
         foreign_doc = Document(id=uuid.uuid4(), user_id=foreign_id, filename="private.txt", content_type="text/plain", metadata_json={}, status="processed")
         session.add_all([own_doc, foreign_doc])
