@@ -178,10 +178,19 @@ React UI
 | Deployment | 3 | CI/CD via GitHub Actions |
 | Deployment | 4 | Cloud-hosted services with environment-based configuration |
 
+## Phase 1 Clarification
+
+| Group | Count | Clarification |
+|---|---:|---|
+| Implementation State | 1 | FastAPI API boundary now exists with an implemented health route. |
+| Implementation State | 2 | Frontend foundation now exists as React + TypeScript + Vite shell with environment-based API configuration. |
+| Implementation State | 3 | Service/agent/tool/database packages are structural seams only; business features remain future-phase scope. |
+
 ## Current Reality vs Intended End State
 
 | Group | Count | Item | State |
 |---|---:|---|---|
 | Current State | 1 | Architecture definition | Documented |
-| Current State | 2 | Runtime architecture implementation | Not implemented yet |
-| Current State | 3 | Production deployment setup | Not implemented yet |
+| Current State | 2 | Backend foundation + health endpoint + tests | Implemented |
+| Current State | 3 | Frontend foundation scaffold | Implemented |
+| Current State | 4 | AI orchestration, RAG, tool-calling, and data platform features | Not implemented yet |
