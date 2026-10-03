@@ -10,6 +10,8 @@ MAX_TOOL_OUTPUT = 6000
 MAX_TRACE_EVENTS = 40
 MAX_AGENT_STEPS = 5
 MAX_TOOLS_PER_REQUEST = 4
+MAX_SEARCH_RESULTS = 3
+MAX_CHUNK_TEXT = 800
 
 
 class ToolError(Exception):
@@ -44,19 +46,21 @@ class ToolRegistry:
 
     def _document_search(self, payload: DocumentSearchInput, user_id: uuid.UUID | None) -> dict:
         chunks = self._retrieval.search(payload.query, payload.top_k, user_id=user_id)
+        results = [
+            {
+                "document_id": item.document_id,
+                "filename": item.filename[:255],
+                "chunk_id": item.chunk_id,
+                "chunk_index": item.chunk_index,
+                "similarity": item.similarity,
+                "content": item.content[:MAX_CHUNK_TEXT],
+            }
+            for item in chunks[:MAX_SEARCH_RESULTS]
+        ]
         return {
             "tool": "document_search",
-            "results": [
-                {
-                    "document_id": item.document_id,
-                    "filename": item.filename,
-                    "chunk_id": item.chunk_id,
-                    "chunk_index": item.chunk_index,
-                    "similarity": item.similarity,
-                    "content": item.content[:1600],
-                }
-                for item in chunks
-            ],
+            "results": results,
+            "truncated": len(chunks) > len(results),
         }
 
     @staticmethod
@@ -66,7 +70,17 @@ class ToolRegistry:
 
     @staticmethod
     def _bound_result(value: dict) -> dict:
+        # Keep source-bearing document results structured; do not stringify away
+        # IDs or provenance when enforcing the tool-output budget.
         text = str(value)
         if len(text) <= MAX_TOOL_OUTPUT:
             return value
-        return {"tool": value.get("tool", "unknown"), "truncated": True, "preview": text[:MAX_TOOL_OUTPUT]}
+        if value.get("tool") == "document_search":
+            compact = dict(value)
+            compact["results"] = [
+                {**item, "content": item.get("content", "")[:400]}
+                for item in value.get("results", [])[:2]
+            ]
+            compact["truncated"] = True
+            return compact
+        return {"tool": value.get("tool", "unknown"), "truncated": True}
