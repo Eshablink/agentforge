@@ -11,8 +11,9 @@ from alembic import op
 import sqlalchemy as sa
 from pgvector.sqlalchemy import Vector
 
+from app.core.constants import EMBEDDING_DIMENSION_DEFAULT
 
-# revision identifiers, used by Alembic.
+
 revision: str = "0001_document_rag_foundation"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
@@ -41,7 +42,7 @@ def upgrade() -> None:
         sa.Column("content", sa.Text(), nullable=False),
         sa.Column("metadata", sa.JSON(), nullable=False, server_default=sa.text("'{}'::jsonb")),
         sa.Column("embedding_model", sa.String(length=128), nullable=False),
-        sa.Column("embedding", Vector(1536), nullable=False),
+        sa.Column("embedding", Vector(EMBEDDING_DIMENSION_DEFAULT), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.UniqueConstraint("document_id", "chunk_index", name="uq_document_chunk_index"),
     )
