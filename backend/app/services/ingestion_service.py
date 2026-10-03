@@ -4,6 +4,7 @@ import uuid
 from dataclasses import dataclass
 
 from fastapi import UploadFile
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.settings import get_settings
@@ -36,44 +37,45 @@ class DocumentIngestionService:
 
         try:
             extracted = self.extractor.extract(file)
-        except ExtractionError as exc:
-            raise IngestionError(str(exc)) from exc
+            chunks = self.chunker.chunk(extracted.text)
 
-        chunks = self.chunker.chunk(extracted.text)
-        if not chunks:
-            raise IngestionError("Document does not contain enough content to ingest")
+            if not chunks:
+                raise IngestionError("Document does not contain enough content to ingest")
 
-        try:
             embeddings = self.embedding_service.embed_texts([chunk.content for chunk in chunks])
-        except EmbeddingError as exc:
-            raise IngestionError(str(exc)) from exc
 
-        document = Document(
-            id=uuid.uuid4(),
-            filename=file.filename or "uploaded-document",
-            content_type=(file.content_type or "application/octet-stream").lower(),
-            metadata_json=extracted.metadata,
-            status="processed",
-        )
-        self.db.add(document)
-        self.db.flush()
-
-        for chunk, embedding in zip(chunks, embeddings, strict=True):
-            self.db.add(
-                DocumentChunk(
-                    id=uuid.uuid4(),
-                    document_id=document.id,
-                    chunk_index=chunk.index,
-                    content=chunk.content,
-                    metadata_json=chunk.metadata,
-                    embedding_model=self.settings.embedding_model,
-                    embedding=embedding,
-                )
+            document = Document(
+                id=uuid.uuid4(),
+                filename=file.filename or "uploaded-document",
+                content_type=(file.content_type or "application/octet-stream").lower(),
+                metadata_json=extracted.metadata,
+                status="processed",
             )
+            self.db.add(document)
+            self.db.flush()
 
-        self.db.commit()
-        self.db.refresh(document)
-        return document, len(chunks)
+            for chunk, embedding in zip(chunks, embeddings, strict=True):
+                self.db.add(
+                    DocumentChunk(
+                        id=uuid.uuid4(),
+                        document_id=document.id,
+                        chunk_index=chunk.index,
+                        content=chunk.content,
+                        metadata_json=chunk.metadata,
+                        embedding_model=self.settings.embedding_model,
+                        embedding=embedding,
+                    )
+                )
+
+            self.db.commit()
+            self.db.refresh(document)
+            return document, len(chunks)
+        except (ExtractionError, EmbeddingError) as exc:
+            self.db.rollback()
+            raise IngestionError(str(exc)) from exc
+        except SQLAlchemyError as exc:
+            self.db.rollback()
+            raise IngestionError("Failed to persist document ingestion data") from exc
 
     def _validate_upload(self, file: UploadFile) -> None:
         if not file.filename:
