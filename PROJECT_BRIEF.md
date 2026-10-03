@@ -2,44 +2,38 @@
 
 ## Project summary
 
-AgentForge is a full-stack document question-answering application. The completed Phase 0–3 product slice lets users upload supported documents, persist and search their content with PostgreSQL/pgvector, and receive grounded answers with source references through a minimal web UI.
+AgentForge is a full-stack application for document ingestion, grounded RAG, safe registered-tool orchestration, persistent conversations, and authenticated user-owned resources.
 
-## Project status
+## Phase status
 
-| Group | Count | Phase/capability | Status |
+| Group | Count | Phase | Status |
 |---|---:|---|---|
-| Completed | 1 | Phase 0 — Repository setup and blueprint | Complete |
-| Completed | 2 | Phase 1 — FastAPI and React application foundation | Complete; merged into `main` |
-| Completed | 3 | Phase 2 — PostgreSQL + pgvector, SQLAlchemy 2.x, Alembic | Implemented and CI-verified |
-| Completed | 4 | Phase 3 — Ingestion, retrieval, grounded RAG, source references, minimal UI | Implemented and CI-verified |
-| Planned | 5 | Phase 4 — Agentic workflows and tool calling | Not started |
-| Planned | 6 | Authentication, authorization, multi-tenancy, complex conversation history, billing, production deployment | Deferred |
+| Complete | 1 | Phase 0 — Repository blueprint | Implemented |
+| Complete | 2 | Phase 1 — FastAPI and React foundation | Implemented |
+| Complete | 3 | Phase 2 — PostgreSQL + pgvector + SQLAlchemy + Alembic | Implemented and verified |
+| Complete | 4 | Phase 3 — Ingestion + vector retrieval + grounded RAG | Implemented and verified |
+| Complete | 5 | Phase 4 — Safe agent workflow and registered tools | Implemented; latest Actions verification to be recorded after final audit commit |
+| Complete | 6 | Phase 5 — Persistent conversations and bounded recent context | Implemented; latest Actions verification to be recorded after final audit commit |
+| Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented; latest Actions verification to be recorded after final audit commit |
+| Deferred | 8 | Deployment, SSO/MFA, rate limiting, billing, analytics, Phase 7+ | Not implemented |
 
-## Implemented and verified capabilities
+## Implemented capabilities
 
-| Group | Count | Capability | Details |
+| Group | Count | Capability | Implementation |
 |---|---:|---|---|
-| Application | 1 | FastAPI and React + TypeScript + Vite | Foundation routes and minimal RAG UI |
-| Database | 2 | PostgreSQL + pgvector | SQLAlchemy 2.x models, session management, vector retrieval, Alembic schema migration |
-| Ingestion | 3 | PDF, TXT, and Markdown | Type/size validation, text extraction, deterministic chunking, provider-abstracted embeddings, transactional persistence |
-| Retrieval | 4 | Similarity search | pgvector cosine distance and bounded `top_k`, with document/chunk provenance |
-| RAG | 5 | Grounded answers | Retrieved context passed through an LLM abstraction; explicit insufficient-context response and source references |
-| Verification | 6 | GitHub Actions | PostgreSQL/pgvector service, migration, import smoke test, backend pytest, and frontend production build |
+| Agent | 1 | Structured orchestration | Typed decisions; bounded execution loop and operational trace |
+| Agent | 2 | Safe tool registry | Existing retrieval-backed document search, Decimal calculator, date offset; strict schemas and bounded outputs |
+| Conversation | 3 | Persistent sessions | PostgreSQL conversations/messages; ownership checks; bounded recent-message context |
+| Authentication | 4 | Account/session foundation | PBKDF2-SHA256 password hashes; opaque random bearer tokens stored as hashes; expiry and revocation |
+| Ownership | 5 | Private user data | Owned document routes and per-user pgvector filtering; conversation queries scoped to current user |
+| UI/CI | 6 | Full-stack flow | Existing UI extended for registration/login, documents, conversations, agent answers, sources and trace |
 
-Phase 2–3 checks passed in GitHub Actions on PR #3 before merge. The verified PR run was 37117613154 and the matching push run was 37117610042 on commit `7f77050e739047bc19d955cdc2498054c228b7d4`. Documentation follow-up commit `9099462e914c40d843f6080f96efd016802bdd80` also received successful push and PR CI checks. Re-run checks after later application changes; do not treat historical verification as proof of new code.
+## Verification policy
 
-## Technology direction
+Only claim Phases 4–6 verified when the current branch head has a fresh green GitHub Actions run covering PostgreSQL + pgvector, Alembic upgrade, import smoke test, full backend pytest, and frontend production build. A green run proves CI behavior for that commit, not external production deployment.
 
-| Group | Count | Technology |
-|---|---:|---|
-| Frontend | 1 | React, TypeScript, Vite |
-| Backend | 2 | Python, FastAPI, Pydantic, SQLAlchemy 2.x |
-| Data | 3 | PostgreSQL, pgvector, Alembic |
-| AI integration | 4 | Embedding and LLM provider abstractions; fake providers for CI; optional environment-configured external provider |
-| Delivery | 5 | Docker Compose and GitHub Actions |
+## Security and known boundaries
 
-## Explicit boundaries
+No arbitrary code, shell, filesystem, generated SQL, or unrestricted network tools. Model output is validated as data; chain-of-thought is neither stored nor returned. Legacy Phase 3 endpoints remain scoped to unowned legacy documents; new user content uses authenticated owner-scoped routes.
 
-The shipped scope ends at the Phase 2–3 document RAG vertical slice. Autonomous agents, multi-agent orchestration, dynamic tool calling, SQL/Python/web/chart tools, authentication, authorization, multi-tenancy, billing, persistent complex conversation history, and production deployment are **not implemented**. Keep these items planned until separately scoped, implemented, and verified.
-
-Automated tests use fake providers and PostgreSQL + pgvector; they do not require paid LLM APIs or use SQLite in place of vector integration tests.
+The browser stores the bearer token in memory, so reload requires reauthentication. This is a development/deployment foundation, not a deployed production service. SSO/MFA, rate limiting, multi-tenancy administration, deployment, billing, and analytics remain deferred.
