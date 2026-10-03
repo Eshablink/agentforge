@@ -1,104 +1,101 @@
 # AgentForge Architecture
 
-## Architecture Goal
+## Current State
 
-AgentForge is designed as a modular full-stack AI system with clear boundaries between UI, API, document processing, retrieval, and answer generation.
+Phases 0–3 are implemented and verified: repository/application foundations plus a PostgreSQL/pgvector document-ingestion and grounded-RAG vertical slice. See `PROGRESS.md` for the post-merge CI evidence. Agent orchestration, dynamic tool calling, authentication, and conversation memory are not implemented.
 
-## Current Vertical Slice (Phases 2 + 3)
-
-### Ingestion Pipeline
+## Implemented Ingestion Pipeline
 
 ```text
-File
+PDF/TXT/Markdown upload
   ↓
-Extractor (PDF/TXT/Markdown)
+Type/size validation and text extraction
   ↓
-Normalized Text
+Normalized text
   ↓
-Deterministic Chunker
+Deterministic chunking
   ↓
-Embedding Service
+Embedding provider abstraction
   ↓
-PostgreSQL + pgvector
+PostgreSQL + pgvector persistence (transactional)
 ```
 
-### Query Pipeline
+## Implemented Query Pipeline
 
 ```text
 Question
   ↓
-Query Embedding
+Query embedding
   ↓
-pgvector Similarity Retrieval
+pgvector cosine-distance retrieval (bounded top_k)
   ↓
-Context Construction
+Context construction
   ↓
-LLM Service
+LLM provider abstraction
   ↓
-Answer + Source References
+Grounded answer + source references
 ```
 
 ## Layer Responsibilities
 
-### Frontend (React + TypeScript)
+### Frontend (React + TypeScript + Vite)
 
 | Group | Count | Responsibility |
 |---|---:|---|
 | Frontend | 1 | Upload documents |
-| Frontend | 2 | List document status/chunk count |
+| Frontend | 2 | List ingested document status/chunk counts |
 | Frontend | 3 | Ask grounded questions |
-| Frontend | 4 | Render answers and cited sources |
+| Frontend | 4 | Render answer and source references |
 
-### API Layer (FastAPI)
-
-| Group | Count | Endpoint | Responsibility |
-|---|---:|---|---|
-| API | 1 | `GET /health` | Service health check |
-| API | 2 | `POST /documents` | Upload + ingest document pipeline |
-| API | 3 | `GET /documents` | List ingested documents |
-| API | 4 | `POST /chat` | Retrieval + grounded answer generation |
-
-### Database Layer
+### API and Service Layers
 
 | Group | Count | Component | Responsibility |
-|---|---:|---|---|
-| Data | 1 | PostgreSQL | Relational storage for documents and chunks |
-| Data | 2 | pgvector | Dense vector storage and similarity search |
-| Data | 3 | Alembic | Schema migrations and extension bootstrap |
+|---|---:|---|
+| API | 1 | `GET /health` | Health response |
+| API | 2 | `POST /documents` | Upload and ingest document |
+| API | 3 | `GET /documents` | List documents and chunk counts |
+| API | 4 | `POST /chat` | Retrieval and grounded answer generation |
+| Service | 5 | `extractor`, `chunker` | Text extraction and deterministic chunk construction |
+| Service | 6 | `embedding_service`, `retrieval_service` | Embedding abstraction and pgvector search |
+| Service | 7 | `llm_service`, `rag_service` | Answer-provider abstraction, context assembly, response/source construction |
 
-## Data Model (Current)
+### Database and Migrations
+
+| Group | Count | Component | Responsibility |
+|---|---:|---|
+| Data | 1 | PostgreSQL | Relational document/chunk storage |
+| Data | 2 | pgvector | Vector storage and cosine-distance query support |
+| Data | 3 | SQLAlchemy 2.x | Declarative models, sessions, and ORM operations |
+| Data | 4 | Alembic | Versioned schema migration and pgvector extension bootstrap |
+
+`app.db.base` defines the declarative base independently. Model modules register their mappings, and Alembic imports model modules explicitly to populate metadata without circular imports. The supported schema/runtime embedding dimension is 1536. Runtime settings reject unsupported dimensions; migrations are versioned, not generated dynamically from environment values.
+
+### Startup and Verification
+
+Docker Compose waits for PostgreSQL health. The backend container runs `alembic upgrade head` before starting Uvicorn, so a fresh Compose database gets the schema without a manual initialization step. CI uses a PostgreSQL + pgvector service, applies Alembic, runs the import smoke test and full backend pytest suite, then builds the frontend.
+
+## Data Model
 
 | Group | Count | Table | Purpose |
 |---|---:|---|---|
-| Models | 1 | `documents` | Document metadata and lifecycle status |
-| Models | 2 | `document_chunks` | Chunk text, ordering, and embeddings |
+| Models | 1 | `documents` | Uploaded document metadata and lifecycle status |
+| Models | 2 | `document_chunks` | Chunk text/order, metadata, embedding model, and vector |
 
-## Service Boundaries
+## Grounding Behavior
 
-| Group | Count | Service | Responsibility |
-|---|---:|---|---|
-| Services | 1 | `extractor` | File-type-specific text extraction |
-| Services | 2 | `chunker` | Deterministic chunking with overlap |
-| Services | 3 | `embedding_service` | Provider-abstracted embedding generation |
-| Services | 4 | `retrieval_service` | pgvector similarity retrieval (`top_k`) |
-| Services | 5 | `llm_service` | Provider-abstracted answer generation |
-| Services | 6 | `rag_service` | Context assembly + answer + source references |
-
-## Retrieval and Grounding Guarantees
-
-| Group | Count | Guarantee |
+| Group | Count | Behavior |
 |---|---:|---|
-| Grounding | 1 | Retrieval happens before generation |
-| Grounding | 2 | LLM prompt enforces context-only answering |
-| Grounding | 3 | Source metadata is returned with each answer |
-| Grounding | 4 | Insufficient context returns explicit uncertainty |
+| Grounding | 1 | Retrieval precedes answer generation |
+| Grounding | 2 | LLM instructions constrain answers to retrieved context |
+| Grounding | 3 | Source identifiers, filename, chunk index, and similarity are returned |
+| Grounding | 4 | Empty retrieval yields explicit insufficient-context response |
 
-## Current Non-Goals
+## Phase 4+ Non-Goals (Not Yet Implemented)
 
-| Group | Count | Not Implemented Yet |
+| Group | Count | Deferred capability |
 |---|---:|---|
-| Deferred | 1 | Autonomous agent workflows |
+| Deferred | 1 | Autonomous or multi-agent workflows |
 | Deferred | 2 | Dynamic tool-calling runtime |
-| Deferred | 3 | Authentication/authorization |
+| Deferred | 3 | Authentication and authorization |
 | Deferred | 4 | Multi-user conversation memory |
 | Deferred | 5 | Production deployment hardening |
