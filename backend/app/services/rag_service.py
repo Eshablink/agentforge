@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import uuid
+
 from sqlalchemy.orm import Session
 
 from app.schemas.chat import ChatResponse, ChatSource
@@ -18,43 +20,23 @@ class RAGService:
         self.retrieval = RetrievalService(db=db)
         self.llm = LLMService()
 
-    def answer(self, question: str, top_k: int | None = None) -> ChatResponse:
+    def answer(self, question: str, top_k: int | None = None, *, user_id: uuid.UUID | None = None) -> ChatResponse:
         try:
-            retrieved = self.retrieval.search(question=question, top_k=top_k)
+            retrieved = self.retrieval.search(question=question, top_k=top_k, user_id=user_id)
         except EmbeddingError as exc:
             raise RAGServiceError("Failed to generate retrieval embedding") from exc
 
         if not retrieved:
-            return ChatResponse(
-                answer="I could not find enough information in the uploaded documents to answer that.",
-                sources=[],
-                retrieved_chunks=0,
-            )
+            return ChatResponse(answer="I could not find enough information in the uploaded documents to answer that.", sources=[], retrieved_chunks=0)
 
         context = self._build_context(retrieved)
-
         try:
             answer = self.llm.answer(question=question, context=context)
         except LLMError as exc:
             raise RAGServiceError("Failed to generate grounded answer") from exc
 
-        sources = [
-            ChatSource(
-                document_id=item.document_id,
-                filename=item.filename,
-                chunk_id=item.chunk_id,
-                chunk_index=item.chunk_index,
-                similarity=round(item.similarity, 6),
-            )
-            for item in retrieved
-        ]
-
+        sources = [ChatSource(document_id=item.document_id, filename=item.filename, chunk_id=item.chunk_id, chunk_index=item.chunk_index, similarity=round(item.similarity, 6)) for item in retrieved]
         return ChatResponse(answer=answer, sources=sources, retrieved_chunks=len(retrieved))
 
     def _build_context(self, chunks) -> str:
-        return "\n\n".join(
-            [
-                f"[source {idx}] {item.filename} (chunk {item.chunk_index})\n{item.content}"
-                for idx, item in enumerate(chunks, start=1)
-            ]
-        )
+        return "\n\n".join(f"[source {idx}] {item.filename} (chunk {item.chunk_index})\n{item.content}" for idx, item in enumerate(chunks, start=1))
