@@ -2,7 +2,7 @@
 
 ## Product summary
 
-AgentForge is a full-stack application for document ingestion, grounded RAG, safe registered-tool orchestration, persistent conversations, and authenticated user-owned resources.
+AgentForge is a full-stack application for document ingestion, grounded RAG, safe registered-tool orchestration, persistent conversations and authenticated user-owned resources.
 
 ## Phase status
 
@@ -20,7 +20,7 @@ AgentForge is a full-stack application for document ingestion, grounded RAG, saf
 ## Implemented capabilities
 
 | Group | Count | Capability | Implementation |
-|---|---:|---|---|
+|---|---:|---|
 | Agent | 1 | Structured orchestration | Typed decisions; bounded execution loop and operational trace |
 | Agent | 2 | Safe tool registry | Existing retrieval-backed document search, Decimal calculator, date offset; strict schemas and bounded outputs |
 | Conversation | 3 | Persistent sessions | PostgreSQL conversations/messages; ownership checks; bounded recent-message context |
@@ -30,9 +30,9 @@ AgentForge is a full-stack application for document ingestion, grounded RAG, saf
 
 ## Verification record
 
-GitHub Actions run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744) passed backend and frontend checks on audit-hardened application commit `445eb36f512e33160df5916e45e1a8f80306903a`. Documentation follow-up runs [37129523143](https://github.com/Eshablink/agentforge/actions/runs/37129523143) and [37129536765](https://github.com/Eshablink/agentforge/actions/runs/37129536765) passed. The latest comprehensive verification run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888) passed backend and frontend on `3ddffd055739611e405c206b17d7931d2bb93374`; the immediately following README-only commit is undergoing its own fresh CI run.
+GitHub Actions run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744) passed backend and frontend checks on audit-hardened application commit `445eb36f512e33160df5916e45e1a8f80306903a`. Documentation follow-up runs [37129523143](https://github.com/Eshablink/agentforge/actions/runs/37129523143), [37129536765](https://github.com/Eshablink/agentforge/actions/runs/37129536765), and consolidated run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888) passed the application and documentation checks then present. Later audit-only commits are being checked by fresh runs; verify the current PR-head checks before merge.
 
-CI uses PostgreSQL + pgvector; runs Alembic upgrade, import smoke test, complete backend pytest, and frontend TypeScript/Vite production build. Fake providers make tests independent of paid API credentials.
+CI uses PostgreSQL + pgvector, Alembic, import smoke test, complete backend pytest, and frontend TypeScript/Vite production build. Fake providers avoid paid API credentials.
 
 ## Security boundaries and limitations
 
