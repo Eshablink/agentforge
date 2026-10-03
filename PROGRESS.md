@@ -2,7 +2,7 @@
 
 ## Current status
 
-Phases 0–6 are implemented. Phases 0–3 are complete and merged. Phases 4–6 implementation and release-readiness hardening are CI-verified on the open PR #6 branch. This is a production-oriented foundation, not a deployed production service. Phase 7+ has not started.
+Phases 0–6 are implemented. Phases 0–3 are complete and merged. Phases 4–6 implementation and release-readiness hardening are CI-verified on the open PR #6 branch. This is a production-oriented foundation, not a deployed service. Phase 7+ has not started.
 
 ## Roadmap
 
@@ -11,19 +11,21 @@ Phases 0–6 are implemented. Phases 0–3 are complete and merged. Phases 4–6
 | Complete | 1 | Phase 0 — Repository blueprint | Implemented and verified |
 | Complete | 2 | Phase 1 — Application foundation | Implemented and merged |
 | Complete | 3 | Phase 2 — PostgreSQL + pgvector | Implemented and verified |
-| Complete | 4 | Phase 3 — Document ingestion + RAG | Implemented and verified |
-| Complete | 5 | Phase 4 — Agent workflow + registered safe tools | Implemented and verified on PR branch |
-| Complete | 6 | Phase 5 — Conversations + bounded context memory | Implemented and verified on PR branch |
-| Complete | 7 | Phase 6 — Authentication + ownership foundation | Implemented and verified on PR branch |
+| Complete | 4 | Phase 3 — Document ingestion and RAG | Implemented and verified |
+| Complete | 5 | Phase 4 — Agent orchestration and safe registered tools | Implemented; Actions verified |
+| Complete | 6 | Phase 5 — Persistent conversations and bounded recent memory | Implemented; Actions verified |
+| Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented; Actions verified |
 | Deferred | 8 | SSO/MFA, rate limiting, billing, cloud deployment and Phase 7+ | Not implemented |
 
-## Implemented Phase 4–6 capabilities
+## Phase 4–6 implementation
 
-- Typed agent decisions and provider boundary; registered `document_search`, calculator, and date-offset tools; bounded steps/tool calls/output/events; safe provider/tool failure responses; citations retained from actual retrieval.
-- Conversations and messages persisted in PostgreSQL; recent context is bounded by configured message count and characters and scoped to the selected owned conversation.
-- PBKDF2-SHA256 password hashes, random bearer sessions stored as token hashes, expiry/revocation, owned documents and conversations, owner-filtered RAG retrieval.
-- Legacy Phase 3 document and chat endpoints remain for unowned legacy documents only; new private content uses authenticated routes.
-- Existing Phase 0–3 vector schema, ingestion, RAG service and UI were reused rather than replaced.
+- Typed agent decisions and provider abstraction; deterministic fake provider for CI.
+- Registered `document_search` (existing owner-aware pgvector retrieval), Decimal calculator, and deterministic date offset; strict arguments and bounded tools/iterations/traces.
+- PostgreSQL conversations/messages with per-user ownership and bounded recent context, ordered deterministically.
+- PBKDF2-SHA256 password hashes, random bearer tokens persisted only as hashes, expiry and revocation.
+- Authenticated document upload/list, conversation CRUD/message and agent routes; vector search filters by authenticated user.
+- Preserved legacy Phase 3 document/chat paths for unowned records only.
+- Audit hardening: explicit production CORS/provider checks, safe provider error fallback, structured bounded RAG output and reproducible message ordering.
 
 ## Verification record
 
@@ -31,17 +33,16 @@ Phases 0–6 are implemented. Phases 0–3 are complete and merged. Phases 4–6
 - Follow-up documentation CI runs [37129523143](https://github.com/Eshablink/agentforge/actions/runs/37129523143), [37129536765](https://github.com/Eshablink/agentforge/actions/runs/37129536765), and [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888) passed.
 - Latest consolidated audit commit `3ddffd055739611e405c206b17d7931d2bb93374`: run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888) passed backend and frontend.
 
-These Actions runs include PostgreSQL + pgvector service, Alembic upgrade, import smoke test, full backend pytest and frontend production TypeScript/Vite build. They use fake providers and no paid credentials. The latest docs changes require their own CI run before claiming that newer head is verified.
+Each green run included PostgreSQL + pgvector, Alembic `upgrade head`, import smoke test, complete backend pytest (including database ownership/retrieval tests), and frontend production TypeScript/Vite build. CI uses fake providers and requires no paid credentials. Newer documentation-only commits require their own CI result before claims about that exact branch head.
 
-## Audit findings and mitigations
+## Release-readiness audit findings
 
-- Production configuration now requires explicit CORS origins and rejects wildcard origins; agent steps/tool calls and output are bounded.
-- Provider errors are converted to a generic safe agent response without leaking exception details.
-- Structured document-search results are bounded while retaining source identifiers.
-- Conversation memory selects recent messages with deterministic timestamp/ID order and persists each user/assistant turn together.
-- Cross-user conversation/document access returns empty/not-found results; pgvector retrieval filters by authenticated owner. Legacy retrieval only includes unowned rows.
-- Bearer token is memory-only in browser; re-login after reload is required. SSO/MFA, rate limiting and deployed HTTPS/reverse-proxy operations remain deployment work.
+- Authenticated RAG propagates user ID through agent → tool registry → RAG → retrieval. Retrieval filters to that owner; legacy paths filter to `user_id IS NULL` only.
+- Conversation ownership is checked in route queries; memory uses only the requested owned conversation, with bounded recent messages/characters and stable time/ID order.
+- Credentials are salted PBKDF2-SHA256 password hashes and opaque random bearer sessions stored as hashes with expiry/revocation. Production requires explicit CORS and validates selected-provider credentials.
+- Tools are allowlisted and schema-validated; no arbitrary code, shell, filesystem, generated SQL or unrestricted network execution. Provider failures are handled safely, and traces omit hidden reasoning/secrets.
+- Audit found and hardened production CORS/resource limits, generic provider failure handling, structured source-preserving tool output, and stable conversation message ordering.
 
 ## Deferred scope
 
-No cloud/Kubernetes deployment, SSO/MFA, billing, advanced analytics, unrestricted network/code tools or Phase 7+ functionality has been started.
+Browser bearer token is memory-only and requires reauthentication after reload. No deployed cloud/Kubernetes service, SSO/MFA, rate limiting, billing, advanced analytics, arbitrary network/code tools, or Phase 7+ functionality has started.
