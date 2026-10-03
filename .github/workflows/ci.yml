@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - feat/application-foundation
+      - feat/database-rag-foundation
   pull_request:
     branches:
       - main
@@ -14,9 +15,29 @@ jobs:
     name: Backend Tests
     runs-on: ubuntu-latest
 
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: agentforge
+          POSTGRES_USER: agentforge
+          POSTGRES_PASSWORD: agentforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentforge -d agentforge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
     defaults:
       run:
         working-directory: backend
+
+    env:
+      DATABASE_URL: postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge
+      EMBEDDING_PROVIDER: fake
+      LLM_PROVIDER: fake
 
     steps:
       - name: Checkout repository
@@ -32,7 +53,13 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run tests
+      - name: Run Alembic migrations
+        run: alembic -c alembic.ini upgrade head
+
+      - name: Run import smoke test
+        run: python -c "from app.main import app; print(app.title)"
+
+      - name: Run backend tests
         run: pytest
 
   frontend:
