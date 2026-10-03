@@ -1,14 +1,14 @@
 # AgentForge Decisions
 
-This file records architecture choices for the Phase 0–6 foundation. Verification is tied to specific GitHub Actions runs/commits in `PROGRESS.md` and PR #6. A green CI foundation is not a claim of external production deployment.
+This file records decisions implemented in the Phase 0–6 foundation. Verification is tied to specific GitHub Actions runs/commits in `PROGRESS.md` and PR #6. Passing CI demonstrates the tested foundation, not external production deployment.
 
 ## ADR-001 — React + TypeScript + Vite
-- **Decision:** Use React, TypeScript and Vite for the browser UI.
-- **Reason:** Typed interfaces and incremental development.
+- **Decision:** Use React, TypeScript and Vite for the frontend.
+- **Reason:** Typed interfaces and incremental UI development.
 - **Status:** Accepted; implemented.
 
 ## ADR-002 — FastAPI + Python
-- **Decision:** Use FastAPI and typed Pydantic schemas for APIs and service composition.
+- **Decision:** Use FastAPI and Pydantic schemas for APIs and service composition.
 - **Reason:** Request validation and separation of transport from business logic.
 - **Status:** Accepted; implemented.
 
@@ -64,9 +64,9 @@ This file records architecture choices for the Phase 0–6 foundation. Verificat
 
 ## ADR-013 — PostgreSQL-backed CI and health-gated startup
 - **Decision:** PostgreSQL + pgvector service, health check, Alembic migration, import smoke test, full pytest and TypeScript/Vite build in GitHub Actions; Docker backend migrates before serving.
-- **Reason:** Verify actual persistence/vector behavior and deterministic fresh startup.
-- **Status:** Accepted; green Actions run 37129401744 on audit-hardened code. Newer docs/CI runs are referenced in `PROGRESS.md`.
+- **Reason:** Verify actual persistence/vector behavior and deterministic boot.
+- **Status:** Accepted; green run 37129401744 on application audit code; latest full verification is recorded in `PROGRESS.md`.
 
 ## Deferred scope
 
-No SSO/MFA, rate limiting, billing, advanced analytics, cloud/Kubernetes deployment or Phase 7+ implementation. This is not a deployed production service.
+No SSO/MFA, formal rate limiting, billing, advanced analytics, cloud/Kubernetes deployment or Phase 7+ implementation. This is not a deployed production service.
