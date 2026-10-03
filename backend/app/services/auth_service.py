@@ -1,12 +1,14 @@
 from __future__ import annotations
 
-import uuid
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.settings import get_settings
@@ -19,19 +21,16 @@ _bearer = HTTPBearer(auto_error=False)
 
 
 def _token_hash(token: str) -> str:
-    import hashlib
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def register_user(db: Session, payload: RegisterRequest) -> User:
     email = str(payload.email).strip().lower()
-    if db.scalar(select(User).where(User.email == email)):
-        raise HTTPException(status_code=409, detail="Account already exists")
     user = User(email=email, password_hash=_passwords.hash(payload.password), is_active=True)
     db.add(user)
     try:
         db.commit()
-    except Exception as exc:
+    except IntegrityError as exc:
         db.rollback()
         raise HTTPException(status_code=409, detail="Account already exists") from exc
     db.refresh(user)
@@ -46,7 +45,7 @@ def login_user(db: Session, payload: LoginRequest) -> tuple[User, str, datetime]
         valid = False
     if not valid or user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    token = __import__("secrets").token_urlsafe(36)
+    token = secrets.token_urlsafe(36)
     expires = datetime.now(timezone.utc) + timedelta(seconds=get_settings().session_ttl_seconds)
     db.add(AuthSession(user_id=user.id, token_hash=_token_hash(token), expires_at=expires))
     db.commit()
