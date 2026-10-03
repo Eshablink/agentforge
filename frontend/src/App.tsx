@@ -1,10 +1,14 @@
-import { apiClient } from "./services/api/client";
+import type { AppInfo } from "./types/app";
 import { HomePage } from "./pages/HomePage";
+import { apiClient } from "./services/api/client";
+
+const appInfo: AppInfo = {
+  name: "AgentForge",
+  description: "Production-style agentic AI platform foundation",
+};
 
 function App() {
-  const apiUrl = apiClient.baseUrl;
-
-  return <HomePage apiUrl={apiUrl} />;
+  return <HomePage apiUrl={apiClient.baseUrl} appInfo={appInfo} />;
 }
 
 export default App;
