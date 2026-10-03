@@ -75,6 +75,57 @@ Production-style full-stack agentic AI platform for source-grounded conversation
 | DevOps | 2 | GitHub Actions |
 | DevOps | 3 | Cloud deployment |
 
+## Local Setup
+
+### 1) Environment
+
+```bash
+cp .env.example .env
+```
+
+### 2) Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Backend URL: `http://localhost:8000`
+Health endpoint: `http://localhost:8000/health`
+
+### 3) Backend tests
+
+```bash
+cd backend
+pytest
+```
+
+### 4) Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend URL: `http://localhost:5173`
+
+### 5) Frontend build
+
+```bash
+cd frontend
+npm run build
+```
+
+### 6) Docker Compose
+
+```bash
+docker compose up --build
+```
+
 ## High-Level Architecture
 
 ```text
