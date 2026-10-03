@@ -1,12 +1,10 @@
-version: "3.9"
-
 services:
   db:
     image: pgvector/pgvector:pg16
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-agentforge}
-      - POSTGRES_USER=${POSTGRES_USER:-agentforge}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-agentforge}
+      POSTGRES_DB: ${POSTGRES_DB:-agentforge}
+      POSTGRES_USER: ${POSTGRES_USER:-agentforge}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agentforge}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -22,24 +20,30 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      - APP_NAME=${APP_NAME:-AgentForge API}
-      - APP_ENV=${APP_ENV:-development}
-      - APP_VERSION=${APP_VERSION:-0.1.0}
-      - API_PREFIX=${API_PREFIX:-}
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost:5173}
-      - DATABASE_URL=${DATABASE_URL:-postgresql+psycopg://agentforge:agentforge@db:5432/agentforge}
-      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-fake}
-      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-text-embedding-3-small}
-      - EMBEDDING_DIMENSION=${EMBEDDING_DIMENSION:-1536}
-      - LLM_PROVIDER=${LLM_PROVIDER:-fake}
-      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - CHUNK_SIZE=${CHUNK_SIZE:-800}
-      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-120}
-      - RAG_TOP_K_DEFAULT=${RAG_TOP_K_DEFAULT:-5}
-      - RAG_TOP_K_MAX=${RAG_TOP_K_MAX:-10}
-      - MAX_UPLOAD_SIZE_BYTES=${MAX_UPLOAD_SIZE_BYTES:-10485760}
-      - SUPPORTED_CONTENT_TYPES=${SUPPORTED_CONTENT_TYPES:-application/pdf,text/plain,text/markdown}
+      APP_NAME: ${APP_NAME:-AgentForge API}
+      APP_ENV: ${APP_ENV:-development}
+      APP_VERSION: ${APP_VERSION:-0.1.0}
+      API_PREFIX: ${API_PREFIX:-}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://agentforge:agentforge@db:5432/agentforge}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-fake}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AUTH_SECRET: ${AUTH_SECRET:-}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-3600}
+      MAX_AGENT_STEPS: ${MAX_AGENT_STEPS:-5}
+      MAX_TOOL_CALLS: ${MAX_TOOL_CALLS:-4}
+      MAX_CONVERSATION_MESSAGES: ${MAX_CONVERSATION_MESSAGES:-20}
+      MAX_CONVERSATION_CONTEXT_CHARS: ${MAX_CONVERSATION_CONTEXT_CHARS:-8000}
+      CHUNK_SIZE: ${CHUNK_SIZE:-800}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-120}
+      RAG_TOP_K_DEFAULT: ${RAG_TOP_K_DEFAULT:-5}
+      RAG_TOP_K_MAX: ${RAG_TOP_K_MAX:-10}
+      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-10485760}
+      SUPPORTED_CONTENT_TYPES: ${SUPPORTED_CONTENT_TYPES:-application/pdf,text/plain,text/markdown}
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -51,7 +55,7 @@ services:
       context: .
       dockerfile: frontend/Dockerfile
     environment:
-      - VITE_API_BASE_URL=${VITE_API_BASE_URL:-http://localhost:8000}
+      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
