@@ -1,65 +1,31 @@
 # AgentForge — Engineering Instructions
 
-## Project identity and verified state
+## Project state
 
 Repository: `Eshablink/agentforge`.
 
-AgentForge is a full-stack document question-answering application. The repository currently contains completed Phase 0–3 work:
+**Verified phases:** Phases 0–3 are complete. Phase 4–6 code is implemented on `feat/agentforge-phases-4-6`; Actions run [37128835442](https://github.com/Eshablink/agentforge/actions/runs/37128835442) passed both backend and frontend jobs on commit `5544bdd1b9c168ac627c67a2af610f65a3e4287d`. Re-run all checks after any subsequent application-code changes. PR #6 remains open and must not be merged without explicit authorization.
 
-- **Phase 0 — Repository setup and project blueprint:** complete.
-- **Phase 1 — Application foundation:** complete and merged into `main`.
-- **Phase 2 — PostgreSQL + pgvector foundation:** implemented and verified.
-- **Phase 3 — Document ingestion + RAG foundation:** implemented and verified.
+The branch adds bounded agent orchestration; typed structured provider decisions; registered document-search, calculator, and date tools; PostgreSQL conversations with bounded recent context; PBKDF2 password hashing; hashed expiring/revocable bearer sessions; per-user document/conversation ownership; owner-scoped pgvector retrieval; and React authentication/conversation/agent UI.
 
-Phase 2–3 verification was performed by GitHub Actions on PR #3 before its merge: PostgreSQL + pgvector service, Alembic migration, application import smoke test, backend pytest suite, and frontend production build passed. The documented CI runs are PR run 37117613154 and push run 37117610042 on commit `7f77050e739047bc19d955cdc2498054c228b7d4`; subsequent documentation commit `9099462e914c40d843f6080f96efd016802bdd80` also had successful push and PR checks. Treat verification claims as tied to reported run/commit; rerun CI for later code changes.
-
-### Current scope
-
-Implemented: FastAPI APIs; React/TypeScript/Vite frontend; PostgreSQL with pgvector; SQLAlchemy 2.x; Alembic; PDF/TXT/Markdown extraction; deterministic chunking; embedding and LLM abstractions with fake providers for automated tests; vector retrieval; grounded RAG answers with source references; Docker Compose support; PostgreSQL-backed integration tests and GitHub Actions CI.
-
-Not implemented: autonomous agents, tool-calling workflows, authentication/authorization, complex conversation history, multi-tenancy, billing, or production deployment. These remain future work; do not begin a future phase unless explicitly requested.
+This is a production-oriented foundation, not a deployed production service. The browser holds bearer tokens in memory (reload requires sign-in); legacy Phase 3 endpoints are retained for unowned documents. SSO/MFA, rate limiting, cloud deployment, Kubernetes, billing, and Phase 7+ work remain deferred.
 
 ## Engineering method
 
-Work as a disciplined software engineer. Before changes:
-
-1. Inspect the current branch, relevant code, tests, workflows, and documentation.
-2. Understand existing behavior and boundaries before editing.
-3. Make the smallest focused change that addresses the requested issue.
-4. Preserve public interfaces unless a change is explicitly required.
-5. Add or update tests that demonstrate changed behavior.
-6. Run relevant tests, builds, and checks; do not claim success without actual results.
-7. Update documentation only to match implemented and verified state.
-8. Review the diff for unrelated changes, secrets, and regressions.
-
-Do not restart completed phases, refactor unrelated code, introduce speculative features, or describe future functionality as implemented.
+Inspect current branch, code, tests, migrations, workflows, and docs before changing anything. Preserve existing behavior and interfaces unless the scoped task requires otherwise. Make focused changes, add regression tests, run relevant checks, and inspect the final diff. Do not restart completed phases, introduce unrelated features, or claim verification without actual results.
 
 ## Architecture and data boundaries
 
-Keep UI, API, services, models, database, and provider integrations independently understandable. PostgreSQL + pgvector is the supported runtime/test database; do not substitute SQLite for database or vector integration tests. Runtime embedding dimension and migration schema must remain aligned; migrations must not depend on arbitrary runtime dimension environment values. Alembic imports mapped model modules explicitly while the declarative base remains independently defined.
+Keep frontend, API, authentication/authorization, conversation services, agent orchestration, providers, tools, retrieval, and persistence separate. PostgreSQL + pgvector is required for DB integration tests; do not substitute SQLite. Reuse the existing retrieval service for document search. Keep Alembic deterministic and model registration acyclic.
 
-Tests that write committed PostgreSQL document data must be isolated from other tests. Preserve real pgvector cosine-similarity coverage. Automated tests use fake providers and must not require a paid LLM/embedding API.
+Treat user and model data as untrusted. Only registered typed tools may execute; reject unknown tools and invalid arguments. Never execute generated code, unrestricted SQL, shell, arbitrary filesystem operations, or unrestricted network requests. Do not expose chain-of-thought. Bound requests, tool output, traces, agent steps, and memory context. Enforce ownership on every user-specific read/write path.
 
-Use a deterministic migration path for fresh Docker startup. Handle ingestion failures with rollback and controlled service/API errors. Never expose raw internal exceptions unnecessarily.
+## Security and configuration
 
-## Code quality and security
+Never store plaintext passwords. Store only hashes of random bearer tokens and enforce expiry/revocation. Production settings require explicit CORS origins and credentials when a paid provider is selected. Never commit secrets; use environment variables and safe `.env.example` placeholders.
 
-Prefer clear naming, small modules, explicit interfaces, validation, type safety, focused error handling, and testable code. Avoid unnecessary dependencies, dead code, duplicated logic, hard-coded secrets, broad exception leakage, and import hacks that hide architectural problems.
+## Testing and delivery
 
-Never commit API keys, passwords, access tokens, private credentials, or production secrets. Use environment variables and safe `.env.example` placeholders.
+Tests must be deterministic and must not require paid APIs. Preserve PostgreSQL + pgvector integration and cross-user isolation coverage. For affected changes, run Alembic, import smoke test, full backend pytest, and frontend production build. CI is the source for current verification. Do not merge PR #6 or begin another phase without explicit direction.
 
-## Testing requirements
-
-Meaningful behavior requires tests. Before declaring a change complete, run all relevant checks, including PostgreSQL + pgvector integration when database behavior changes. Verify application imports, Alembic migrations, backend pytest, and frontend production build as appropriate. Never infer tests passed from code inspection or a workflow definition; use actual run results.
-
-## Documentation
-
-Keep `README.md`, `PROJECT_BRIEF.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and `DECISIONS.md` consistent with the repository. Clearly distinguish implemented/verified behavior from planned work. Record significant architecture choices in `DECISIONS.md`.
-
-## Git and delivery
-
-Use conventional, focused commits. Before committing, review changed files, run relevant checks, and ensure no secrets are included. Keep to the requested branch/PR; do not merge a PR unless explicitly asked. For documentation-only work, confirm no application behavior changed.
-
-## Reporting
-
-Summarize files changed, actual checks and results, commit/PR status, and remaining deferred work. Keep claims precise and report blockers honestly.
+Keep README, PROJECT_BRIEF, ARCHITECTURE, DECISIONS, and PROGRESS synchronized. Distinguish verified foundation from deployed production readiness.
