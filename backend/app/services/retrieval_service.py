@@ -41,8 +41,11 @@ class RetrievalService:
             .order_by(distance)
             .limit(k)
         )
-        if user_id is not None:
-            statement = statement.where(Document.user_id == user_id)
+        # Legacy/unauthenticated Phase 3 retrieval is limited to unowned records;
+        # authenticated requests can only search documents belonging to that user.
+        statement = statement.where(
+            Document.user_id.is_(None) if user_id is None else Document.user_id == user_id
+        )
         rows = self.db.execute(statement).all()
         return [
             RetrievedChunk(
