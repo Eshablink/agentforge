@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 
 import { apiClient } from "../services/api/client";
 import type { AppInfo, ChatResponse, DocumentSummary } from "../types/app";
@@ -30,7 +31,7 @@ export function HomePage({ apiUrl, appInfo }: HomePageProps) {
     }
   }
 
-  async function handleUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -47,7 +48,7 @@ export function HomePage({ apiUrl, appInfo }: HomePageProps) {
     }
   }
 
-  async function handleAsk(event: React.FormEvent<HTMLFormElement>) {
+  async function handleAsk(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!question.trim()) return;
 
