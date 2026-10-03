@@ -56,10 +56,19 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_security_settings(self):
-        if self.app_env.lower() == "production" and (not self.auth_secret or len(self.auth_secret) < 32):
-            raise ValueError("AUTH_SECRET must be configured with at least 32 characters in production")
+        production = self.app_env.lower() == "production"
+        if production:
+            if not self.auth_secret or len(self.auth_secret) < 32:
+                raise ValueError("AUTH_SECRET must be configured with at least 32 characters in production")
+            origins = self.cors_origin_list
+            if not origins or "*" in origins:
+                raise ValueError("CORS_ORIGINS must contain explicit origins in production")
         if self.session_ttl_seconds < 60 or self.password_min_length < 12:
             raise ValueError("session lifetime and password minimum are below secure defaults")
+        if not 1 <= self.max_agent_steps <= 5 or not 1 <= self.max_tool_calls <= 4:
+            raise ValueError("agent execution limits exceed safe configured bounds")
+        if self.max_upload_size_bytes < 1 or self.max_conversation_messages < 1 or self.max_conversation_context_chars < 1:
+            raise ValueError("configured resource limits must be positive")
         return self
 
     @property
