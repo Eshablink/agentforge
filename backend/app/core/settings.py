@@ -1,4 +1,4 @@
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.core.constants import (
@@ -15,30 +15,24 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     api_prefix: str = ""
     cors_origins: str = "http://localhost:5173"
-
     database_url: str = "postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge"
-
     max_upload_size_bytes: int = 10 * 1024 * 1024
     supported_content_types: str = "application/pdf,text/plain,text/markdown"
-
     chunk_size: int = 800
     chunk_overlap: int = 120
-
     embedding_provider: str = "fake"
     embedding_model: str = EMBEDDING_MODEL_DEFAULT
     embedding_dimension: int = EMBEDDING_DIMENSION_DEFAULT
     openai_api_key: str | None = None
-
     llm_provider: str = "fake"
     llm_model: str = LLM_MODEL_DEFAULT
-    auth_secret: str = "development-only-change-me"
+    auth_secret: str | None = None
     session_ttl_seconds: int = 3600
     password_min_length: int = 12
     max_agent_steps: int = 5
     max_tool_calls: int = 4
     max_conversation_messages: int = 20
     max_conversation_context_chars: int = 8000
-
     rag_top_k_default: int = 5
     rag_top_k_max: int = 10
 
@@ -60,20 +54,13 @@ class Settings(BaseSettings):
             raise ValueError(f"Unsupported embedding_dimension {value}. Supported dimensions: {supported}")
         return value
 
-    @field_validator("auth_secret")
-    @classmethod
-    def validate_auth_secret(cls, value: str, info) -> str:
-        env_name = str(info.data.get("app_env", "development")).lower()
-        if env_name == "production" and (len(value) < 32 or value == "development-only-change-me"):
-            raise ValueError("AUTH_SECRET must be a unique value of at least 32 characters in production")
-        return value
-
-    @field_validator("session_ttl_seconds", "max_agent_steps", "max_tool_calls", "max_conversation_messages", "max_conversation_context_chars")
-    @classmethod
-    def positive_limits(cls, value: int) -> int:
-        if value < 1:
-            raise ValueError("configured limits must be positive")
-        return value
+    @model_validator(mode="after")
+    def validate_security_settings(self):
+        if self.app_env.lower() == "production" and (not self.auth_secret or len(self.auth_secret) < 32):
+            raise ValueError("AUTH_SECRET must be configured with at least 32 characters in production")
+        if self.session_ttl_seconds < 60 or self.password_min_length < 12:
+            raise ValueError("session lifetime and password minimum are below secure defaults")
+        return self
 
     @property
     def cors_origin_list(self) -> list[str]:
