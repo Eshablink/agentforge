@@ -1,51 +1,50 @@
-# AgentForge README
+# AgentForge
 
-Full-stack document question answering with PostgreSQL + pgvector retrieval and grounded responses with source references.
+Full-stack document question-answering application with PostgreSQL + pgvector retrieval and grounded answers with source references. Phases 0–3 are complete and merged. Agentic workflows and tool calling are not implemented.
 
-## Project status
+## Current Status
 
-| Group | Count | Phase | Status |
+| Group | Count | Phase / capability | Status |
 |---|---:|---|---|
-| Completed | 1 | Phase 0 — Repository setup and blueprint | Complete |
-| Completed | 2 | Phase 1 — Application foundation | Complete; merged into `main` |
-| Completed | 3 | Phase 2 — PostgreSQL + pgvector foundation | Implemented and CI-verified |
-| Completed | 4 | Phase 3 — Document ingestion and RAG foundation | Implemented and CI-verified |
-| Planned | 5 | Phase 4 — Agentic workflows and tool calling | Not started |
-| Deferred | 6 | Authentication, complex conversation history, multi-tenancy, billing, production deployment | Not implemented |
+| Complete | 1 | Phase 0 — Repository setup and blueprint | Complete |
+| Complete | 2 | Phase 1 — Application foundation | Complete |
+| Complete | 3 | Phase 2 — PostgreSQL + pgvector | Complete; CI-verified |
+| Complete | 4 | Phase 3 — Document ingestion + RAG foundation | Complete; CI-verified |
+| Deferred | 5 | Agents and tool calling | Not started |
+| Deferred | 6 | Authentication, conversation memory, multi-tenancy, billing, production deployment | Not implemented |
 
-Phase 2–3 GitHub Actions verification passed on PR #3: run 37117613154 (PR) and 37117610042 (push), commit `7f77050e739047bc19d955cdc2498054c228b7d4`. Follow-up documentation commit `9099462e914c40d843f6080f96efd016802bdd80` also had successful PR/push CI. Subsequent code changes must be verified by fresh checks.
+### Post-merge CI evidence
 
-## Implemented capabilities
+- Phase 0–3 merge commit `67e983772257dc575475e86ebecbe6548c968eb9`: GitHub Actions run [37117875205](https://github.com/Eshablink/agentforge/actions/runs/37117875205) passed.
+- Documentation cleanup merge commit `cded4a9bf39d267200f1de072600d1648b19182f`: run [37119471555](https://github.com/Eshablink/agentforge/actions/runs/37119471555) passed.
+- Each run covered PostgreSQL + pgvector, Alembic migration, application import, backend pytest and frontend production build. These verify the corresponding commits only; run fresh CI for subsequent code changes.
+
+## Implemented Capabilities
 
 | Group | Count | Capability |
 |---|---:|---|
-| Backend | 1 | FastAPI health, document upload/list, and chat APIs |
-| Database | 2 | SQLAlchemy 2.x, PostgreSQL + pgvector, Alembic migrations |
-| Ingestion | 3 | PDF/TXT/Markdown extraction, upload validation, deterministic chunking, embeddings, transactional persistence |
+| Backend | 1 | FastAPI `/health`, `/documents`, and `/chat` APIs |
+| Database | 2 | SQLAlchemy 2.x, PostgreSQL + pgvector, Alembic migration |
+| Ingestion | 3 | PDF/TXT/Markdown extraction, validation, deterministic chunking, embedding abstraction, transactional persistence |
 | Retrieval/RAG | 4 | pgvector cosine similarity, bounded `top_k`, grounded context/answers, source references |
-| Frontend | 5 | React + TypeScript + Vite upload/list/query/source display vertical slice |
-| Development/CI | 6 | Docker Compose with PostgreSQL/pgvector; CI migration, import smoke test, pytest, and frontend build |
+| Frontend | 5 | React + TypeScript + Vite upload/list/query/source display |
+| Development/CI | 6 | Docker Compose; PostgreSQL-backed migration, pytest, import and frontend build checks |
 
-Automated tests use fake embedding and LLM providers and PostgreSQL + pgvector; no paid external API is needed.
+Automated tests use fake embedding and LLM providers and require no paid API credentials.
 
-## Local setup
-
-Copy `.env.example` to `.env` and adjust values as needed:
+## Local Setup
 
 ```bash
 cp .env.example .env
 ```
 
-Run the full development stack (database becomes healthy before backend migration/startup):
+For the full stack, including PostgreSQL readiness and backend migration-before-API startup:
 
 ```bash
 docker compose up --build
 ```
 
-Frontend: `http://localhost:5173`  
-Backend: `http://localhost:8000`
-
-For host-based backend development, start PostgreSQL with pgvector first, install dependencies, then migrate and start the API:
+For host-based development, start PostgreSQL with pgvector first, then run the backend:
 
 ```bash
 cd backend
@@ -56,7 +55,7 @@ alembic -c alembic.ini upgrade head
 uvicorn app.main:app --reload
 ```
 
-In another terminal:
+In a separate terminal:
 
 ```bash
 cd frontend
@@ -64,39 +63,28 @@ npm install
 npm run dev
 ```
 
-## API overview
+## APIs
 
 | Group | Count | Endpoint | Purpose |
 |---|---:|---|---|
-| Health | 1 | `GET /health` | API health response |
-| Documents | 2 | `POST /documents` | Upload, extract, chunk, embed, persist |
+| Health | 1 | `GET /health` | Health response |
+| Documents | 2 | `POST /documents` | Upload, extract, chunk, embed and persist |
 | Documents | 3 | `GET /documents` | List documents and chunk counts |
 | RAG | 4 | `POST /chat` | Retrieve context and return grounded answer with sources |
 
-Example request:
+## Verification
 
-```json
-{
-  "question": "What does the document say about refunds?",
-  "top_k": 5
-}
-```
-
-## Verification commands
-
-CI uses PostgreSQL + pgvector and runs Alembic before the backend import and full pytest suite. Locally, with a reachable PostgreSQL + pgvector database:
+With PostgreSQL + pgvector running and `DATABASE_URL` configured:
 
 ```bash
 cd backend
 alembic -c alembic.ini upgrade head
 python -c "from app.main import app; print(app.title)"
 pytest
-
 cd ../frontend
-npm install
 npm run build
 ```
 
-## Scope boundary
+## Scope Boundary
 
-Phase 4 (agents and tool calling) has not started. Authentication/authorization, multi-tenancy, complex memory, analytics tools, and production deployment are also not implemented.
+No agent orchestration, tool-calling runtime, authentication/authorization, conversation memory, multi-tenancy, analytics tools, billing or production deployment has been implemented. Phase 4 has not started.
