@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -16,17 +17,36 @@ from app.db.dependencies import get_db
 from app.models.user import AuthSession, User
 from app.schemas.platform import LoginRequest, RegisterRequest
 
-_passwords = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _bearer = HTTPBearer(auto_error=False)
+_ITERATIONS = 600_000
 
 
 def _token_hash(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def _hash_password(password: str) -> str:
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, _ITERATIONS)
+    return f"pbkdf2_sha256${_ITERATIONS}${base64.urlsafe_b64encode(salt).decode()}${base64.urlsafe_b64encode(digest).decode()}"
+
+
+def _verify_password(password: str, encoded: str) -> bool:
+    try:
+        scheme, iterations, salt_b64, digest_b64 = encoded.split("$", 3)
+        if scheme != "pbkdf2_sha256":
+            return False
+        salt = base64.urlsafe_b64decode(salt_b64.encode())
+        expected = base64.urlsafe_b64decode(digest_b64.encode())
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, int(iterations))
+        return hmac.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
+
+
 def register_user(db: Session, payload: RegisterRequest) -> User:
     email = str(payload.email).strip().lower()
-    user = User(email=email, password_hash=_passwords.hash(payload.password), is_active=True)
+    user = User(email=email, password_hash=_hash_password(payload.password), is_active=True)
     db.add(user)
     try:
         db.commit()
@@ -39,11 +59,7 @@ def register_user(db: Session, payload: RegisterRequest) -> User:
 
 def login_user(db: Session, payload: LoginRequest) -> tuple[User, str, datetime]:
     user = db.scalar(select(User).where(User.email == str(payload.email).lower()))
-    try:
-        valid = bool(user and _passwords.verify(payload.password, user.password_hash) and user.is_active)
-    except (ValueError, TypeError):
-        valid = False
-    if not valid or user is None:
+    if user is None or not user.is_active or not _verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = secrets.token_urlsafe(36)
     expires = datetime.now(timezone.utc) + timedelta(seconds=get_settings().session_ttl_seconds)
