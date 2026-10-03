@@ -7,7 +7,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.settings import get_settings
 from app.db.base import Base
-from app.models.document import Document, DocumentChunk  # noqa: F401
+import app.models  # noqa: F401 - register every mapped model before reading metadata
 
 config = context.config
 settings = get_settings()
@@ -16,14 +16,12 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 config.set_main_option("sqlalchemy.url", settings.database_url)
-
 target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
     context.configure(url=url, target_metadata=target_metadata, literal_binds=True)
-
     with context.begin_transaction():
         context.run_migrations()
 
@@ -34,10 +32,8 @@ def run_migrations_online() -> None:
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
-
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
-
         with context.begin_transaction():
             context.run_migrations()
 
