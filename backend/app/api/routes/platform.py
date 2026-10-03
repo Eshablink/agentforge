@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
@@ -11,16 +12,9 @@ from app.db.dependencies import get_db
 from app.models.conversation import Conversation, Message
 from app.models.user import User
 from app.schemas.platform import (
-    AgentChatRequest,
-    AgentChatResponse,
-    ConversationCreateRequest,
-    ConversationMessageRequest,
-    ConversationResponse,
-    LoginRequest,
-    MessageResponse,
-    RegisterRequest,
-    SessionResponse,
-    UserResponse,
+    AgentChatRequest, AgentChatResponse, ConversationCreateRequest,
+    ConversationMessageRequest, ConversationResponse, LoginRequest,
+    MessageResponse, RegisterRequest, SessionResponse, UserResponse,
 )
 from app.services.agent_provider import FakeDecisionProvider, OpenAIDecisionProvider
 from app.services.agent_service import AgentOrchestrationService
@@ -34,10 +28,11 @@ router = APIRouter(tags=["identity", "conversations", "agent"])
 def _service(db: Session) -> AgentOrchestrationService:
     retrieval = RetrievalService(db)
     settings = get_settings()
-    if settings.llm_provider.lower() == "openai" and settings.openai_api_key:
-        provider = OpenAIDecisionProvider(settings.openai_api_key, settings.llm_model)
-    else:
-        provider = FakeDecisionProvider()
+    provider = (
+        OpenAIDecisionProvider(settings.openai_api_key, settings.llm_model)
+        if settings.llm_provider.lower() == "openai" and settings.openai_api_key
+        else FakeDecisionProvider()
+    )
     return AgentOrchestrationService(provider, ToolRegistry(retrieval))
 
 
@@ -61,11 +56,11 @@ def logout(db: Session = Depends(get_db), user: User = Depends(current_user)) ->
 
 @router.post("/conversations", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
 def create_conversation(payload: ConversationCreateRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> ConversationResponse:
-    c = Conversation(user_id=user.id, title=payload.title)
-    db.add(c)
+    conversation = Conversation(user_id=user.id, title=payload.title)
+    db.add(conversation)
     db.commit()
-    db.refresh(c)
-    return ConversationResponse(id=c.id, title=c.title, created_at=c.created_at, updated_at=c.updated_at, messages=[])
+    db.refresh(conversation)
+    return ConversationResponse(id=conversation.id, title=conversation.title, created_at=conversation.created_at, updated_at=conversation.updated_at, messages=[])
 
 
 @router.get("/conversations", response_model=list[ConversationResponse])
@@ -74,63 +69,75 @@ def list_conversations(db: Session = Depends(get_db), user: User = Depends(curre
     return [ConversationResponse(id=c.id, title=c.title, created_at=c.created_at, updated_at=c.updated_at, messages=[]) for c in rows]
 
 
-def _owned_conversation(db: Session, user: User, conversation_id) -> Conversation:
-    row = db.scalar(select(Conversation).where(Conversation.id == conversation_id, Conversation.user_id == user.id))
-    if row is None:
+def _owned_conversation(db: Session, user: User, conversation_id: UUID) -> Conversation:
+    conversation = db.scalar(select(Conversation).where(Conversation.id == conversation_id, Conversation.user_id == user.id))
+    if conversation is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
-    return row
+    return conversation
 
 
-def _messages_response(c: Conversation) -> list[MessageResponse]:
-    return [MessageResponse(id=m.id, role=m.role, content=m.content, created_at=m.created_at) for m in c.messages]
-
-
-def _memory_context(db: Session, c: Conversation) -> str:
+def _memory_context(db: Session, conversation: Conversation) -> str:
     settings = get_settings()
-    recent = db.scalars(select(Message).where(Message.conversation_id == c.id).order_by(Message.created_at.desc()).limit(settings.max_conversation_messages)).all()
-    return "\n".join(f"{m.role}: {m.content[:1200]}" for m in reversed(recent))[-settings.max_conversation_context_chars:]
+    recent = db.scalars(
+        select(Message)
+        .where(Message.conversation_id == conversation.id)
+        .order_by(Message.created_at.desc(), Message.id.desc())
+        .limit(settings.max_conversation_messages)
+    ).all()
+    return "\n".join(f"{message.role}: {message.content[:1200]}" for message in reversed(recent))[-settings.max_conversation_context_chars:]
 
 
-def _store_result(db: Session, c: Conversation, question: str, result: AgentChatResponse) -> None:
-    db.add(Message(conversation_id=c.id, role="user", content=question))
-    db.add(Message(conversation_id=c.id, role="assistant", content=result.answer, metadata_json={"answer_kind": result.answer_kind, "tools_used": result.tools_used, "sources": [s.model_dump(mode="json") for s in result.sources], "events": [e.model_dump() for e in result.events]}))
-    c.updated_at = datetime.now(timezone.utc)
+def _persist_exchange(db: Session, conversation: Conversation, question: str, result: AgentChatResponse) -> None:
+    db.add_all([
+        Message(conversation_id=conversation.id, role="user", content=question),
+        Message(
+            conversation_id=conversation.id,
+            role="assistant",
+            content=result.answer,
+            metadata_json={
+                "answer_kind": result.answer_kind,
+                "tools_used": result.tools_used,
+                "sources": [source.model_dump(mode="json") for source in result.sources],
+                "events": [event.model_dump() for event in result.events],
+            },
+        ),
+    ])
+    conversation.updated_at = datetime.now(timezone.utc)
     db.commit()
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
-def get_conversation(conversation_id, db: Session = Depends(get_db), user: User = Depends(current_user)) -> ConversationResponse:
-    c = _owned_conversation(db, user, conversation_id)
-    return ConversationResponse(id=c.id, title=c.title, created_at=c.created_at, updated_at=c.updated_at, messages=_messages_response(c))
+def get_conversation(conversation_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)) -> ConversationResponse:
+    conversation = _owned_conversation(db, user, conversation_id)
+    messages = [MessageResponse(id=m.id, role=m.role, content=m.content, created_at=m.created_at) for m in conversation.messages]
+    return ConversationResponse(id=conversation.id, title=conversation.title, created_at=conversation.created_at, updated_at=conversation.updated_at, messages=messages)
 
 
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_conversation(conversation_id, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Response:
-    c = _owned_conversation(db, user, conversation_id)
-    db.delete(c)
+def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Response:
+    conversation = _owned_conversation(db, user, conversation_id)
+    db.delete(conversation)
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/conversations/{conversation_id}/messages", response_model=ConversationResponse)
-def add_message(conversation_id, payload: ConversationMessageRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> ConversationResponse:
-    c = _owned_conversation(db, user, conversation_id)
-    context = _memory_context(db, c)
+def add_message(conversation_id: UUID, payload: ConversationMessageRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> ConversationResponse:
+    conversation = _owned_conversation(db, user, conversation_id)
+    context = _memory_context(db, conversation)
     result = _service(db).run(payload.content, context=context, user_id=user.id).response()
-    _store_result(db, c, payload.content, result)
-    db.refresh(c)
-    return ConversationResponse(id=c.id, title=c.title, created_at=c.created_at, updated_at=c.updated_at, messages=_messages_response(c))
+    _persist_exchange(db, conversation, payload.content, result)
+    db.refresh(conversation)
+    messages = [MessageResponse(id=m.id, role=m.role, content=m.content, created_at=m.created_at) for m in conversation.messages]
+    return ConversationResponse(id=conversation.id, title=conversation.title, created_at=conversation.created_at, updated_at=conversation.updated_at, messages=messages)
 
 
 @router.post("/agent/chat", response_model=AgentChatResponse)
 def agent_chat(payload: AgentChatRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> AgentChatResponse:
-    context = ""
-    c = None
-    if payload.conversation_id is not None:
-        c = _owned_conversation(db, user, payload.conversation_id)
-        context = _memory_context(db, c)
+    conversation = _owned_conversation(db, user, payload.conversation_id) if payload.conversation_id is not None else None
+    context = _memory_context(db, conversation) if conversation is not None else ""
     result = _service(db).run(payload.question, context=context, user_id=user.id).response()
-    if c is not None:
-        _store_result(db, c, payload.question, result)
-        result.conversation_id = c.id
+    if conversation is not None:
+        _persist_exchange(db, conversation, payload.question, result)
+        result.conversation_id = conversation.id
     return result
