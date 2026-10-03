@@ -1,6 +1,6 @@
 # AgentForge
 
-Production-style full-stack agentic AI platform for source-grounded conversational intelligence.
+Production-style full-stack AI platform for grounded document question answering.
 
 ## Current Status
 
@@ -8,34 +8,32 @@ Production-style full-stack agentic AI platform for source-grounded conversation
 |---|---:|---|---|
 | Project Status | 1 | Phase 0 — Repository Setup | Complete |
 | Project Status | 2 | Phase 1 — Application Foundation | Complete |
-| Project Status | 3 | Advanced AI capabilities (RAG/agents/tool-calling) | Planned |
+| Project Status | 3 | Phase 2 — PostgreSQL + pgvector Foundation | Implemented |
+| Project Status | 4 | Phase 3 — Document Ingestion + RAG Foundation | Implemented |
+| Project Status | 5 | Agentic workflows/tool calling/auth | Planned |
 
-## Implemented in Phase 1
-
-| Group | Count | Capability |
-|---|---:|---|
-| Backend Foundation | 1 | FastAPI application scaffold under `backend/app` |
-| Backend Foundation | 2 | `GET /health` endpoint |
-| Backend Foundation | 3 | Backend test suite for startup and health response |
-| Frontend Foundation | 4 | React + TypeScript + Vite scaffold under `frontend/` |
-| Frontend Foundation | 5 | Frontend API base URL configuration via `VITE_API_BASE_URL` |
-| Project Setup | 6 | Root `.env.example` and Docker Compose wiring for frontend/backend |
-| Project Setup | 7 | Container build files for backend and frontend |
-
-## Planned Capabilities
+## Implemented Capabilities
 
 | Group | Count | Capability |
 |---|---:|---|
-| Knowledge Workflows | 1 | Document upload and ingestion |
-| Knowledge Workflows | 2 | Q&A over uploaded information |
-| Knowledge Workflows | 3 | Retrieval-Augmented Generation (RAG) |
-| Agentic AI | 4 | AI agent interaction with conversational context |
-| Agentic AI | 5 | Dynamic tool selection and execution |
-| Data Access | 6 | Structured SQL/database querying |
-| Analytics | 7 | Python-based analysis workflows |
-| Integrations | 8 | External web/API data retrieval |
-| Visualization | 9 | Chart and visualization generation |
-| Response Quality | 10 | Source-grounded answer synthesis |
+| Backend | 1 | FastAPI application with `/health`, `/documents`, and `/chat` |
+| Backend | 2 | SQLAlchemy 2.x models for `documents` and `document_chunks` |
+| Backend | 3 | PostgreSQL + pgvector vector storage and similarity retrieval |
+| Backend | 4 | Alembic migration with `CREATE EXTENSION vector` |
+| Backend | 5 | PDF/TXT/Markdown extraction, deterministic chunking, embedding pipeline |
+| Backend | 6 | RAG service with grounded context construction and source references |
+| Frontend | 7 | Minimal upload/list/query UI for end-to-end RAG slice |
+| Tooling | 8 | Docker Compose with backend, frontend, and pgvector PostgreSQL |
+
+## Out of Scope (Not Yet Implemented)
+
+| Group | Count | Item |
+|---|---:|---|
+| Deferred Scope | 1 | Autonomous/agentic workflows |
+| Deferred Scope | 2 | Tool-calling runtime |
+| Deferred Scope | 3 | Authentication/authorization |
+| Deferred Scope | 4 | Persistent conversation memory |
+| Deferred Scope | 5 | Production deployment hardening |
 
 ## Technology Stack
 
@@ -53,55 +51,56 @@ Production-style full-stack agentic AI platform for source-grounded conversation
 |---|---:|---|
 | Backend | 1 | Python |
 | Backend | 2 | FastAPI |
-| Backend | 3 | Pydantic |
-| Backend | 4 | REST APIs |
+| Backend | 3 | SQLAlchemy 2.x |
+| Backend | 4 | Alembic |
+| Backend | 5 | PostgreSQL + pgvector |
 
-### AI & Data (Planned beyond Phase 1)
+## Environment Variables
 
-| Group | Count | Stack Item |
-|---|---:|---|
-| AI | 1 | OpenAI API |
-| AI | 2 | LangChain |
-| AI | 3 | Agentic workflows and tool calling |
-| AI | 4 | RAG and embeddings |
-| Data | 5 | PostgreSQL |
-| Data | 6 | pgvector |
-
-### Delivery & Operations
-
-| Group | Count | Stack Item |
-|---|---:|---|
-| DevOps | 1 | Docker |
-| DevOps | 2 | GitHub Actions |
-| DevOps | 3 | Cloud deployment |
-
-## Local Setup
-
-### 1) Environment
+Copy and edit:
 
 ```bash
 cp .env.example .env
 ```
 
-### 2) Backend
+Key variables:
+
+| Group | Count | Variable | Purpose |
+|---|---:|---|---|
+| App | 1 | `APP_NAME`, `APP_ENV`, `APP_VERSION`, `API_PREFIX` | API metadata and base path |
+| Database | 2 | `DATABASE_URL` | SQLAlchemy/Alembic connection URL |
+| Database | 3 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT` | Docker PostgreSQL configuration |
+| RAG | 4 | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSION` | Embedding config boundary |
+| RAG | 5 | `LLM_PROVIDER`, `LLM_MODEL`, `OPENAI_API_KEY` | LLM provider and model configuration |
+| RAG | 6 | `CHUNK_SIZE`, `CHUNK_OVERLAP`, `RAG_TOP_K_DEFAULT`, `RAG_TOP_K_MAX` | Retrieval and chunking behavior |
+| Upload | 7 | `MAX_UPLOAD_SIZE_BYTES`, `SUPPORTED_CONTENT_TYPES` | Upload validation controls |
+
+## Local Setup
+
+### 1) Backend
 
 ```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+### 2) Run migrations
+
+```bash
+cd backend
+alembic -c alembic.ini upgrade head
+```
+
+### 3) Start backend
+
+```bash
+cd backend
 uvicorn app.main:app --reload
 ```
 
 Backend URL: `http://localhost:8000`
-Health endpoint: `http://localhost:8000/health`
-
-### 3) Backend tests
-
-```bash
-cd backend
-pytest
-```
 
 ### 4) Frontend
 
@@ -113,59 +112,70 @@ npm run dev
 
 Frontend URL: `http://localhost:5173`
 
-### 5) Frontend build
-
-```bash
-cd frontend
-npm run build
-```
-
-### 6) Docker Compose
+### 5) Docker Compose
 
 ```bash
 docker compose up --build
 ```
 
-## High-Level Architecture
+Uses `pgvector/pgvector:pg16` with persistent `postgres_data` volume.
 
-```text
-React + TypeScript
-        ↓
-FastAPI REST API
-        ↓
-Application / Service Layer
-        ↓
-Agent Orchestration
-        ↓
-LLM + Tool Selection
-        ↓
-RAG / SQL / Python / Web APIs / Charts
-        ↓
-PostgreSQL + pgvector + External APIs
-        ↓
-Source-grounded Response to React UI
+## API Overview
+
+| Group | Count | Endpoint | Purpose |
+|---|---:|---|---|
+| Health | 1 | `GET /health` | Service readiness check |
+| Documents | 2 | `POST /documents` | Upload + extract + chunk + embed + persist |
+| Documents | 3 | `GET /documents` | List ingested documents and chunk counts |
+| RAG | 4 | `POST /chat` | Retrieve similar chunks, construct context, generate grounded answer |
+
+### Example chat request
+
+```json
+{
+  "question": "What does the document say about refunds?",
+  "top_k": 5
+}
 ```
 
-See `ARCHITECTURE.md` for detailed boundaries and layer responsibilities.
+### Example chat response
 
-## Development Roadmap
+```json
+{
+  "answer": "...",
+  "sources": [
+    {
+      "document_id": "...",
+      "filename": "policy.pdf",
+      "chunk_id": "...",
+      "chunk_index": 2,
+      "similarity": 0.91
+    }
+  ],
+  "retrieved_chunks": 5
+}
+```
 
-| Group | Count | Phase | Status |
-|---|---:|---|---|
-| Roadmap | 0 | Phase 0 — Repository Setup | COMPLETE |
-| Roadmap | 1 | Phase 1 — Application Foundation | COMPLETE |
-| Roadmap | 2 | Phase 2 — PostgreSQL + pgvector | NEXT |
-| Roadmap | 3 | Phase 3 — Document Ingestion | PLANNED |
-| Roadmap | 4 | Phase 4 — RAG Pipeline | PLANNED |
-| Roadmap | 5 | Phase 5 — LLM Integration | PLANNED |
-| Roadmap | 6 | Phase 6 — Agent Orchestration | PLANNED |
-| Roadmap | 7 | Phase 7 — Tool Calling | PLANNED |
-| Roadmap | 8 | Phase 8 — Analytics + Chart Tools | PLANNED |
-| Roadmap | 9 | Phase 9 — React AI Interface | PLANNED |
-| Roadmap | 10 | Phase 10 — Authentication + Conversation History | PLANNED |
-| Roadmap | 11 | Phase 11 — Dockerization | PLANNED |
-| Roadmap | 12 | Phase 12 — Testing + CI/CD | PLANNED |
-| Roadmap | 13 | Phase 13 — Cloud Deployment | PLANNED |
-| Roadmap | 14 | Phase 14 — Production Polish | PLANNED |
+## Testing
 
-For execution detail, track `PROGRESS.md` and `DECISIONS.md`.
+```bash
+cd backend
+pytest
+
+cd ../frontend
+npm run build
+```
+
+## Architecture Summary
+
+Ingestion pipeline:
+
+```text
+File -> Extractor -> Normalized Text -> Chunker -> Embedding Service -> PostgreSQL + pgvector
+```
+
+Query pipeline:
+
+```text
+Question -> Embedding -> Vector Retrieval -> Context -> LLM -> Answer + Sources
+```
