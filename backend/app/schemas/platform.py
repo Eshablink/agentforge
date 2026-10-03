@@ -11,7 +11,7 @@ class RegisterRequest(BaseModel):
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=1, max_length=128)
+    password: str = Field(min_length=12, max_length=128)
 
 
 class UserResponse(BaseModel):
@@ -64,7 +64,6 @@ class ConversationMessageRequest(BaseModel):
 
 class MessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-
     id: UUID
     role: str
     content: str
