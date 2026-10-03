@@ -19,18 +19,17 @@ class ExtractedDocument:
 
 class DocumentExtractor:
     def extract(self, file: UploadFile) -> ExtractedDocument:
+        filename = (file.filename or "").lower()
         content_type = (file.content_type or "").lower()
         data = file.file.read()
 
         if not data:
             raise ExtractionError("Uploaded file is empty")
 
-        if content_type == "application/pdf" or file.filename.lower().endswith(".pdf"):
+        if content_type == "application/pdf" or filename.endswith(".pdf"):
             return self._extract_pdf(data)
-        if content_type in {"text/plain", "text/markdown"} or file.filename.lower().endswith(
-            (".txt", ".md")
-        ):
-            return self._extract_text(data)
+        if content_type in {"text/plain", "text/markdown"} or filename.endswith((".txt", ".md")):
+            return self._extract_text(data, filename)
 
         raise ExtractionError("Unsupported file type. Supported: PDF, TXT, Markdown")
 
@@ -41,7 +40,7 @@ class DocumentExtractor:
             reader = PdfReader(BytesIO(data))
             texts = [(page.extract_text() or "").strip() for page in reader.pages]
             full_text = "\n\n".join([text for text in texts if text])
-        except Exception as exc:  # pragma: no cover - defensive
+        except Exception as exc:  # pragma: no cover
             raise ExtractionError("Failed to parse PDF file") from exc
 
         if not full_text.strip():
@@ -49,7 +48,7 @@ class DocumentExtractor:
 
         return ExtractedDocument(text=full_text, metadata={"page_count": len(reader.pages), "format": "pdf"})
 
-    def _extract_text(self, data: bytes) -> ExtractedDocument:
+    def _extract_text(self, data: bytes, filename: str) -> ExtractedDocument:
         for encoding in ("utf-8", "latin-1"):
             try:
                 text = data.decode(encoding)
@@ -63,6 +62,6 @@ class DocumentExtractor:
         if not normalized:
             raise ExtractionError("Document text is empty")
 
-        suffix = Path("x.md").suffix
+        suffix = Path(filename).suffix
         format_name = "markdown" if suffix == ".md" else "text"
         return ExtractedDocument(text=normalized, metadata={"format": format_name})
