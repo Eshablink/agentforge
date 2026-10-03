@@ -1,1 +1,6 @@
-from app.models import Document, DocumentChunk  # noqa: F401
+from sqlalchemy.orm import DeclarativeBase
+
+
+class Base(DeclarativeBase):
+    """Shared SQLAlchemy declarative base for all ORM models."""
+
