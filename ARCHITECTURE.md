@@ -1,73 +1,74 @@
 # AgentForge Architecture
 
-## Current verified architecture (Phases 0–3)
+## Current verified platform architecture
 
-AgentForge currently implements a full-stack document RAG slice. Phase 0–3 are complete; Phase 4 agentic workflow/tool-calling work has not started.
+Phases 0–3 provide the document-RAG data foundation. Phases 4–6 add a safe agent path, persistent conversation state and user ownership/authentication. The latest full green application run and audit references are tracked in `PROGRESS.md` and PR #6; this is not a deployed production service.
 
 ```text
 React + TypeScript + Vite
-          ↓ HTTP
-FastAPI routes and request schemas
-          ↓
-Application services
-  ├─ upload → extract PDF/TXT/Markdown → deterministic chunking
-  ├─ embedding provider abstraction → SQLAlchemy persistence
-  └─ query → embedding → pgvector cosine retrieval → grounded LLM answer + sources
-          ↓
+        ↓ HTTP / bearer session
+FastAPI routes and schemas
+        ↓
+Authentication + owner authorization
+        ↓
+Conversation service (bounded recent context)
+        ↓
+Agent orchestration (typed decisions, bounded steps)
+        ↓
+Registered tool registry
+  ├── document_search → existing owner-filtered pgvector retrieval
+  ├── calculator → explicit Decimal operations
+  └── date_offset → deterministic date utility
+        ↓
 PostgreSQL + pgvector (Alembic-managed schema)
 ```
 
-## Ingestion and query paths
-
-### Ingestion
+## Phase 3 ingestion and retrieval (preserved)
 
 ```text
-Upload validation (type/size)
-  → PDF/TXT/Markdown extractor
-  → deterministic chunker
-  → embedding provider
-  → one SQLAlchemy transaction for document + chunks
+PDF/TXT/Markdown upload → validation/extraction → deterministic chunks
+  → embedding provider abstraction → transactional PostgreSQL persistence
+Question → query embedding → pgvector cosine distance → retrieved sources
+  → existing grounded LLM answer service → answer and citations
 ```
 
-The ingestion transaction is rolled back on persistence failures; APIs translate expected service errors to controlled responses. Docker Compose waits for database health and the backend container applies Alembic migrations before starting the API.
+Authenticated retrieval always includes owner filtering. Legacy Phase 3 routes query only unowned legacy documents; authenticated owned records are handled by `/documents/me`, `/me/chat`, and the authenticated agent/conversation routes. Document search invokes the shared `RetrievalService`; no duplicate vector implementation exists.
 
-### Query
+## Agent safety
 
-```text
-Question
-  → query embedding
-  → PostgreSQL/pgvector cosine-distance ordering with bounded top_k
-  → retrieved text and document/chunk provenance
-  → grounded LLM abstraction
-  → answer plus source references (or explicit insufficient-context response)
-```
+| Group | Count | Control |
+|---|---:|---|
+| Safety | 1 | Structured typed decision schema; provider output is untrusted and validated |
+| Safety | 2 | Registry allowlist; unknown tools are rejected |
+| Safety | 3 | Strict per-tool input validation; calculator supports explicit arithmetic only |
+| Safety | 4 | Limits on agent steps, tool calls, retrieved chunks, content, output and trace events |
+| Safety | 5 | No arbitrary Python, shell, filesystem, generated SQL, or unrestricted network tools |
+| Safety | 6 | Trace records operational events only; no hidden reasoning or credentials |
 
-## Layer responsibilities
+Providers are abstractions; CI uses the deterministic fake provider. Optional external provider configuration is environment-driven.
 
-| Group | Count | Layer/component | Responsibility |
+## Identity, ownership and memory
+
+Passwords are salted PBKDF2-SHA256 hashes, never stored plaintext. The client receives an opaque random bearer credential; PostgreSQL stores only its hash with expiry and revocation state. Conversation/document queries enforce `user_id` from authenticated identity, not client-provided owner IDs. Conversations and messages cascade by foreign key. Context selects recent messages with deterministic ordering, then applies message-count and character bounds. Messages from unrelated conversations are never included.
+
+Browser token storage is in-memory, so page reload requires sign-in. Configure explicit production CORS origins and credentials when selecting an external LLM provider. Before external deployment, provision HTTPS/reverse proxy, rate limiting, monitoring, and operational secret management.
+
+## Database and migrations
+
+| Group | Count | Table/component | Responsibility |
 |---|---:|---|---|
-| Frontend | 1 | React + TypeScript + Vite | Upload, list documents, ask questions, display answers and sources |
-| API | 2 | FastAPI | Health, document upload/list, chat routes |
-| Services | 3 | Extractor/chunker | Supported-format extraction and deterministic text segmentation |
-| Services | 4 | Embedding/LLM abstractions | Provider boundary; fake providers keep automated tests deterministic and free of paid API requirements |
-| Services | 5 | Retrieval/RAG | pgvector cosine similarity, context assembly, answer grounding, source propagation |
-| Persistence | 6 | SQLAlchemy 2.x + PostgreSQL/pgvector | Relational metadata, chunk text/vectors, constraints and sessions |
-| Schema | 7 | Alembic | Versioned PostgreSQL schema and pgvector extension setup |
-| Delivery | 8 | Docker Compose + GitHub Actions | Reproducible local services and PostgreSQL-backed CI |
+| Data | 1 | `users` | Account identity and password hash |
+| Data | 2 | `auth_sessions` | Token hash, expiry and revocation |
+| Data | 3 | `documents` | Document metadata and nullable owner for legacy rows |
+| Data | 4 | `document_chunks` | Chunk text/order and pgvector embedding |
+| Data | 5 | `conversations` | User-owned conversation metadata |
+| Data | 6 | `messages` | Ordered role/content and bounded operational metadata |
+| Schema | 7 | Alembic | Deterministic schema revisions, preserving Phase 3 pgvector |
 
-## Data model
+`app.db.base` owns the standalone declarative base. Alembic imports all model modules to register metadata without circular imports. PostgreSQL + pgvector is mandatory for integration verification; SQLite is not substituted.
 
-| Group | Count | Table | Purpose |
-|---|---:|---|---|
-| Models | 1 | `documents` | Filename, content type, metadata, status, timestamps |
-| Models | 2 | `document_chunks` | Ordered chunk text, metadata, embedding model, pgvector embedding |
+## Verification and boundaries
 
-Runtime supports the configured 1536-dimensional embedding schema and rejects unsupported dimensions; Alembic schema is fixed to that supported dimension rather than generated from arbitrary runtime environment values. Alembic imports mapped model modules explicitly; SQLAlchemy declarative base definition is independent of model packages to avoid circular imports.
+The audited Phase 4–6 suite uses PostgreSQL + pgvector, migrations, an import smoke test, backend pytest and TypeScript/Vite build. The specific run/commit pairs are maintained in `PROGRESS.md` and the PR description.
 
-## Verification
-
-Phase 2–3 passed GitHub Actions PR run 37117613154 and push run 37117610042 (PostgreSQL + pgvector readiness, Alembic upgrade, application import smoke test, full backend pytest, and frontend production build). The integration retrieval test uses actual PostgreSQL/pgvector cosine search. Test setup clears document and chunk records before and after each test to isolate API tests that commit rows.
-
-## Explicit non-goals
-
-No autonomous agents, dynamic tool calling, authentication/authorization, multi-tenancy, complex conversation memory, billing, analytics tools, or production deployment are implemented in Phases 0–3. Do not treat these as present architecture or begin Phase 4 without explicit direction.
+Not implemented: SSO/MFA, rate limiting, billing, multi-tenant administration, cloud/Kubernetes deployment, analytics platform, arbitrary code execution, or Phase 7+ work.
