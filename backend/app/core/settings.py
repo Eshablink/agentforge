@@ -5,6 +5,7 @@ from app.core.constants import (
     EMBEDDING_DIMENSION_DEFAULT,
     EMBEDDING_MODEL_DEFAULT,
     LLM_MODEL_DEFAULT,
+    SUPPORTED_EMBEDDING_DIMENSIONS,
 )
 
 
@@ -42,6 +43,16 @@ class Settings(BaseSettings):
         chunk_size = info.data.get("chunk_size", 0)
         if value >= chunk_size:
             raise ValueError("chunk_overlap must be smaller than chunk_size")
+        return value
+
+    @field_validator("embedding_dimension")
+    @classmethod
+    def validate_embedding_dimension(cls, value: int) -> int:
+        if value not in SUPPORTED_EMBEDDING_DIMENSIONS:
+            supported = ", ".join(str(item) for item in sorted(SUPPORTED_EMBEDDING_DIMENSIONS))
+            raise ValueError(
+                f"Unsupported embedding_dimension {value}. Supported dimensions: {supported}"
+            )
         return value
 
     @property
