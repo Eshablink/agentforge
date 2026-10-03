@@ -1,15 +1,19 @@
+import type { AppInfo } from "../types/app";
+
 type HomePageProps = {
   apiUrl: string;
+  appInfo: AppInfo;
 };
 
-export function HomePage({ apiUrl }: HomePageProps) {
+export function HomePage({ apiUrl, appInfo }: HomePageProps) {
   return (
     <main>
       <section className="card">
-        <h1>AgentForge</h1>
+        <h1>{appInfo.name}</h1>
+        <p>{appInfo.description}</p>
         <p>
-          AgentForge is a full-stack agentic AI platform foundation. Phase 1 provides frontend and
-          backend scaffolding, health checks, and test-ready structure.
+          Phase 1 delivers a clean React + TypeScript + Vite frontend, FastAPI backend foundation,
+          and health-check testing.
         </p>
         <p className="meta">Configured API base URL: {apiUrl}</p>
       </section>
