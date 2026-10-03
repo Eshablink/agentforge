@@ -9,6 +9,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from sqlalchemy.engine import make_url
 
 from app.core.settings import get_settings
 
@@ -75,10 +76,15 @@ def wait_for_database(database_url: str, timeout_seconds: int = 90) -> None:
 
 
 def can_connect(database_url: str) -> bool:
+    # psycopg accepts PostgreSQL DSNs, while SQLAlchemy URLs may include the
+    # driver qualifier (+psycopg); normalize that URL before probing readiness.
+    psycopg_dsn = make_url(database_url).set(drivername="postgresql").render_as_string(
+        hide_password=False
+    )
     try:
-        with psycopg.connect(database_url, connect_timeout=1) as conn:
+        with psycopg.connect(psycopg_dsn, connect_timeout=1) as conn:
             with conn.cursor() as cur:
                 cur.execute("SELECT 1")
         return True
-    except Exception:
+    except psycopg.Error:
         return False
