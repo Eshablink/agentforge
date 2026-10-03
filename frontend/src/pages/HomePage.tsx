@@ -65,7 +65,10 @@ export function HomePage({ apiUrl, appInfo }: Props) {
     try {
       const result = await apiClient.agentChat(question.trim(), activeConversation ?? undefined);
       setAnswer(result); setQuestion("");
-      if (activeConversation) await openConversation(activeConversation);
+      if (activeConversation) {
+        const updated = await apiClient.getConversation(activeConversation);
+        setConversations((prev) => [updated, ...prev.filter((item) => item.id !== updated.id)]);
+      }
       await refreshData();
     } catch (err) { setError((err as Error).message); }
     finally { setBusy(false); }
@@ -85,7 +88,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
       <form onSubmit={handleAuth} className="panel">
         <h2>{registerMode ? "Create account" : "Sign in"}</h2>
         <label>Email<input type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-        <label>Password<input type="password" required minLength={registerMode ? 12 : 12} autoComplete={registerMode ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
+        <label>Password<input type="password" required minLength={12} autoComplete={registerMode ? "new-password" : "current-password"} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
         <button disabled={busy}>{busy ? "Please wait…" : registerMode ? "Register" : "Login"}</button>
         <button type="button" onClick={() => setRegisterMode(!registerMode)}>{registerMode ? "Have an account? Sign in" : "Create an account"}</button>
       </form>
