@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import uuid
 from datetime import date, timedelta
 
-from app.models.document import DocumentChunk
 from app.services.agent_provider import CalculatorInput, DateOffsetInput, DocumentSearchInput, calculate
 from app.services.retrieval_service import RetrievalService
 
@@ -29,21 +29,21 @@ class ToolRegistry:
     def names(self) -> set[str]:
         return set(self._handlers)
 
-    def execute(self, name: str, arguments: dict) -> dict:
+    def execute(self, name: str, arguments: dict, *, user_id: uuid.UUID | None = None) -> dict:
         if name not in self._handlers:
             raise ToolError("Requested tool is not available")
         schema, handler = self._handlers[name]
         try:
             payload = schema.model_validate(arguments)
-            result = handler(payload)
+            result = handler(payload, user_id) if name == "document_search" else handler(payload)
             return self._bound_result(result)
         except ToolError:
             raise
         except Exception as exc:
             raise ToolError("Tool request was invalid or could not be completed") from exc
 
-    def _document_search(self, payload: DocumentSearchInput) -> dict:
-        chunks = self._retrieval.search(payload.query, payload.top_k)
+    def _document_search(self, payload: DocumentSearchInput, user_id: uuid.UUID | None) -> dict:
+        chunks = self._retrieval.search(payload.query, payload.top_k, user_id=user_id)
         return {
             "tool": "document_search",
             "results": [
