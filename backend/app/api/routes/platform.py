@@ -1,18 +1,15 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.settings import get_settings
 from app.db.dependencies import get_db
 from app.models.conversation import Conversation, Message
-from app.models.document import Document, DocumentChunk
 from app.models.user import User
-from app.schemas.document import DocumentListItem, DocumentUploadResponse
 from app.schemas.platform import (
     AgentChatRequest,
     AgentChatResponse,
@@ -28,12 +25,10 @@ from app.schemas.platform import (
 from app.services.agent_provider import FakeDecisionProvider, OpenAIDecisionProvider
 from app.services.agent_service import AgentOrchestrationService
 from app.services.auth_service import current_user, login_user, logout_user, register_user
-from app.services.ingestion_service import DocumentIngestionService, IngestionError
 from app.services.retrieval_service import RetrievalService
 from app.services.tool_registry import ToolRegistry
 
 router = APIRouter(tags=["identity", "conversations", "agent"])
-_bearer = HTTPBearer(auto_error=False)
 
 
 def _service(db: Session) -> AgentOrchestrationService:
@@ -59,12 +54,8 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> SessionRespon
 
 
 @router.post("/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
-def logout(
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: Session = Depends(get_db),
-    user: User = Depends(current_user),
-) -> Response:
-    logout_user(db, credentials)
+def logout(db: Session = Depends(get_db), user: User = Depends(current_user)) -> Response:
+    logout_user(db, user)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -86,7 +77,7 @@ def list_conversations(db: Session = Depends(get_db), user: User = Depends(curre
 def _owned_conversation(db: Session, user: User, conversation_id) -> Conversation:
     row = db.scalar(select(Conversation).where(Conversation.id == conversation_id, Conversation.user_id == user.id))
     if row is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
     return row
 
 
@@ -103,6 +94,7 @@ def _memory_context(db: Session, c: Conversation) -> str:
 def _store_result(db: Session, c: Conversation, question: str, result: AgentChatResponse) -> None:
     db.add(Message(conversation_id=c.id, role="user", content=question))
     db.add(Message(conversation_id=c.id, role="assistant", content=result.answer, metadata_json={"answer_kind": result.answer_kind, "tools_used": result.tools_used, "sources": [s.model_dump(mode="json") for s in result.sources], "events": [e.model_dump() for e in result.events]}))
+    c.updated_at = datetime.now(timezone.utc)
     db.commit()
 
 
@@ -142,19 +134,3 @@ def agent_chat(payload: AgentChatRequest, db: Session = Depends(get_db), user: U
         _store_result(db, c, payload.question, result)
         result.conversation_id = c.id
     return result
-
-
-@router.get("/me/documents", response_model=list[DocumentListItem])
-def own_documents(db: Session = Depends(get_db), user: User = Depends(current_user)) -> list[DocumentListItem]:
-    statement = (select(Document, func.count(DocumentChunk.id)).outerjoin(DocumentChunk, Document.id == DocumentChunk.document_id).where(Document.user_id == user.id).group_by(Document.id).order_by(Document.created_at.desc()))
-    rows = db.execute(statement).all()
-    return [DocumentListItem(id=d.id, filename=d.filename, content_type=d.content_type, status=d.status, chunk_count=count, created_at=d.created_at) for d, count in rows]
-
-
-@router.post("/me/documents/upload", response_model=DocumentUploadResponse, status_code=status.HTTP_201_CREATED)
-def upload_owned_document(file: UploadFile = File(...), db: Session = Depends(get_db), user: User = Depends(current_user)) -> DocumentUploadResponse:
-    try:
-        document, count = DocumentIngestionService(db).ingest(file, user_id=user.id)
-    except IngestionError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-    return DocumentUploadResponse(id=document.id, filename=document.filename, content_type=document.content_type, status=document.status, chunk_count=count, created_at=document.created_at)
