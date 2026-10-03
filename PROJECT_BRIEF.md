@@ -2,119 +2,68 @@
 
 ## Project Summary
 
-AgentForge is a production-style full-stack agentic AI platform intended to demonstrate modern AI application engineering as one coherent product.
-
-The platform is designed to let users upload information, ask grounded questions, retrieve and analyze data with AI-assisted workflows, and receive source-backed responses through a conversational interface.
+AgentForge is a full-stack AI application for document ingestion and source-grounded question answering. Its current verified vertical slice lets users upload documents, persist chunks and embeddings in PostgreSQL/pgvector, retrieve relevant context, and return grounded answers with source references.
 
 ## Product Objective
 
-The primary objective is to build one integrated application that demonstrates end-to-end AI full-stack engineering, rather than a collection of disconnected demos.
+Build an integrated AI full-stack application through incremental, independently verified phases. Long-term product ideas below are goals, not claims about current implementation.
 
-## User Capabilities (Target Scope)
+## User Capabilities — Target Scope
 
-| Group | Count | Capability |
-|---|---:|---|
-| Document & Knowledge | 1 | Upload documents |
-| Document & Knowledge | 2 | Ask questions about uploaded information |
-| Document & Knowledge | 3 | Retrieve information using RAG |
-| AI Interaction | 4 | Interact with an AI agent |
-| AI Interaction | 5 | Allow the agent to dynamically select tools |
-| Data & Analysis | 6 | Query structured data |
-| Data & Analysis | 7 | Perform Python-based analysis |
-| External Intelligence | 8 | Retrieve external information through APIs |
-| Visualization | 9 | Generate charts and visualizations |
-| Reliability & UX | 10 | Receive source-grounded answers |
-| Reliability & UX | 11 | Maintain conversational context |
+| Group | Count | Capability | Current state |
+|---|---:|---|---|
+| Document & Knowledge | 1 | Upload PDF, TXT, and Markdown documents | Implemented |
+| Document & Knowledge | 2 | Ask questions over uploaded information | Implemented with RAG pipeline |
+| Document & Knowledge | 3 | Retrieve information using vector search | Implemented with PostgreSQL + pgvector |
+| AI Interaction | 4 | Interact with an autonomous AI agent | Planned; Phase 4+ |
+| AI Interaction | 5 | Allow an agent to dynamically select tools | Planned; Phase 4+ |
+| Data & Analysis | 6 | Query structured data | Planned |
+| Data & Analysis | 7 | Perform Python-based analysis | Planned |
+| External Intelligence | 8 | Retrieve external information through APIs | Planned |
+| Visualization | 9 | Generate charts and visualizations | Planned |
+| Reliability & UX | 10 | Receive source-grounded answers | Implemented in the RAG vertical slice |
+| Reliability & UX | 11 | Maintain conversational context | Not implemented |
 
 ## Technology Direction
 
-### Frontend
-
-| Group | Count | Technology |
-|---|---:|---|
-| Frontend | 1 | React |
-| Frontend | 2 | TypeScript |
-| Frontend | 3 | Vite |
-
-### Backend
-
-| Group | Count | Technology |
-|---|---:|---|
-| Backend | 1 | Python |
-| Backend | 2 | FastAPI |
-| Backend | 3 | Pydantic |
-| Backend | 4 | REST APIs |
-
-### AI
-
-| Group | Count | Technology |
-|---|---:|---|
-| AI | 1 | OpenAI API |
-| AI | 2 | LangChain |
-| AI | 3 | LLM integration |
-| AI | 4 | Agentic workflows |
-| AI | 5 | Tool calling |
-| AI | 6 | RAG |
-| AI | 7 | Embeddings |
-
-### Data
-
-| Group | Count | Technology |
-|---|---:|---|
-| Data | 1 | PostgreSQL |
-| Data | 2 | pgvector |
-
-### Planned Agent Tooling
-
-| Group | Count | Tool |
-|---|---:|---|
-| Agent Tools | 1 | Document search |
-| Agent Tools | 2 | SQL and database querying |
-| Agent Tools | 3 | Python data analysis |
-| Agent Tools | 4 | External web and API retrieval |
-| Agent Tools | 5 | Chart generation |
-
-### Engineering & Delivery
-
-| Group | Count | Practice / Tooling |
-|---|---:|---|
-| Engineering | 1 | Git and GitHub |
-| Engineering | 2 | Docker |
-| Engineering | 3 | GitHub Actions |
-| Engineering | 4 | Cloud deployment |
-
-## Current Implementation vs Planned Scope
-
-### Currently Implemented
-
-| Group | Count | Item | Status Notes |
+| Group | Count | Technology | State |
 |---|---:|---|---|
-| Repository Foundation | 1 | Repository initialized | Present |
-| Repository Foundation | 2 | Engineering and architecture documentation | Present |
-| Application Foundation | 3 | FastAPI backend scaffold | Implemented in Phase 1 |
-| Application Foundation | 4 | `GET /health` endpoint | Implemented in Phase 1 |
-| Application Foundation | 5 | Backend tests for startup and health route | Implemented in Phase 1 |
-| Application Foundation | 6 | React + TypeScript + Vite frontend scaffold | Implemented in Phase 1 |
-| Application Foundation | 7 | Frontend/backend local environment wiring | Implemented in Phase 1 |
+| Frontend | 1 | React | Implemented |
+| Frontend | 2 | TypeScript | Implemented |
+| Frontend | 3 | Vite | Implemented |
+| Backend | 4 | Python + FastAPI | Implemented |
+| Backend | 5 | Pydantic settings and schemas | Implemented |
+| Data | 6 | PostgreSQL | Implemented |
+| Data | 7 | pgvector | Implemented |
+| AI | 8 | Embedding and LLM provider abstractions | Implemented; fake providers used in automated tests |
+| AI | 9 | LangChain/agent workflows/tool calling | Not implemented in Phases 0–3 |
 
-### Planned
+## Implemented Through Phase 3
 
-| Group | Count | Item | Status Notes |
-|---|---:|---|---|
-| Data Layer | 1 | PostgreSQL + pgvector integration | Planned (Phase 2) |
-| AI Pipeline | 2 | Document ingestion + embeddings + retrieval | Planned |
-| AI Pipeline | 3 | LLM response generation | Planned |
-| Agent System | 4 | Agent orchestration and tool selection | Planned |
-| Agent System | 5 | Tool execution modules (RAG/SQL/Python/Web/Charts) | Planned |
-| Product UX | 6 | Source-grounded conversational interface | Planned |
-| Product UX | 7 | Conversation context and history | Planned |
-| Delivery | 8 | Extended CI/CD and cloud deployment hardening | Planned |
-
-## Non-Goals at Current Completion Level
-
-| Group | Count | Non-Goal |
+| Group | Count | Capability |
 |---|---:|---|
-| Scope Boundaries | 1 | No production RAG pipeline yet |
-| Scope Boundaries | 2 | No agent orchestration or dynamic tool-calling runtime yet |
-| Scope Boundaries | 3 | No authentication or multi-user conversation history yet |
-| Scope Boundaries | 4 | No PostgreSQL/pgvector runtime integration yet |
+| Foundation | 1 | Repository and engineering documentation |
+| Foundation | 2 | FastAPI app and `GET /health` |
+| Foundation | 3 | React/TypeScript/Vite frontend |
+| Database | 4 | SQLAlchemy 2.x models, PostgreSQL sessions, Alembic migration, pgvector extension |
+| Ingestion | 5 | PDF/TXT/Markdown extraction, type/size validation, deterministic chunking, embeddings, transactional persistence |
+| Retrieval/RAG | 6 | Bounded `top_k`, pgvector cosine retrieval, context-grounded answer abstraction, source references |
+| UX/CI | 7 | Minimal upload/list/chat frontend vertical slice |
+| UX/CI | 8 | GitHub Actions for PostgreSQL + pgvector migration, backend tests/import smoke test, and frontend build |
+
+## Planned Beyond Phase 3
+
+| Group | Count | Item |
+|---|---:|---|
+| Agent System | 1 | Agent orchestration and tool selection |
+| Agent System | 2 | Tool execution modules (SQL/Python/Web/Charts) |
+| Product UX | 3 | Conversation context and persistent history |
+| Delivery | 4 | Deployment and production hardening |
+
+## Scope Boundaries at Phase 3
+
+No autonomous agent workflows, dynamic tool calling, authentication/authorization, multi-tenant support, conversation memory, or production deployment are implemented. These require separate designs, safeguards, tests, and explicit phase scope.
+
+## Verification Reference
+
+Phase 2+3 passed GitHub Actions after merge. The post-merge `main` workflow run is recorded in `PROGRESS.md`; CI uses PostgreSQL + pgvector, runs Alembic and backend tests, checks the application import, and builds the frontend.
