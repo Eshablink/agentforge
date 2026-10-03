@@ -79,6 +79,34 @@ This file is a lightweight Architecture Decision Record (ADR) log for key projec
 - **Alternatives considered:** Omitting package seams entirely (deferred to reduce future restructuring overhead).
 - **Status:** Accepted
 
+## ADR-012 — pgvector Docker image choice
+
+- **Decision:** Use `pgvector/pgvector:pg16` for local development and CI PostgreSQL service.
+- **Reason:** Maintained Postgres + pgvector image with extension support out of the box.
+- **Alternatives considered:** Plain postgres image with manual extension install (rejected for unnecessary setup fragility).
+- **Status:** Accepted
+
+## ADR-013 — Embedding model and dimension boundary
+
+- **Decision:** Default to `text-embedding-3-small` dimension `1536` with provider and dimension centralized in settings.
+- **Reason:** Reasonable quality/cost baseline and avoids scattering model/dimension literals across code.
+- **Alternatives considered:** Hard-coding values in each service (rejected for maintainability).
+- **Status:** Accepted
+
+## ADR-014 — Deterministic fake providers in tests
+
+- **Decision:** Use deterministic fake embedding + fake LLM behavior for automated tests.
+- **Reason:** Prevents paid external API usage in CI and keeps tests deterministic/reproducible.
+- **Alternatives considered:** Live provider tests (rejected for cost, flakiness, and secret requirements).
+- **Status:** Accepted
+
+## ADR-015 — Synchronous ingestion for first vertical slice
+
+- **Decision:** Implement synchronous upload→extract→chunk→embed→persist flow in API request path.
+- **Reason:** Small, verifiable Phase 2/3 foundation with clear service boundaries; async jobs can be added later.
+- **Alternatives considered:** Queue-based async processing now (deferred to avoid premature complexity).
+- **Status:** Accepted
+
 ## Notes
 
 - Decisions are expected to evolve as implementation proceeds.
