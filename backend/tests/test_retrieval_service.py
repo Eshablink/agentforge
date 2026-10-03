@@ -62,7 +62,7 @@ def test_retrieval_returns_relevant_chunks(monkeypatch) -> None:
                 ),
             ]
         )
-        session.commit()
+        session.flush()
 
         monkeypatch.setattr(EmbeddingService, "embed_texts", lambda self, texts: [near])
 
