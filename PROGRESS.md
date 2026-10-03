@@ -2,81 +2,68 @@
 
 ## Current Phase
 
-Phase 3 — Document Ingestion + RAG Foundation
+Phase 2 + Phase 3 — PostgreSQL/pgvector, Document Ingestion, and RAG Foundation
 
-Status: IN PROGRESS (verification pending)
+Status: COMPLETE — verified by GitHub Actions on commit `7f77050e739047bc19d955cdc2498054c228b7d4`.
 
 ## Development Roadmap
+
+### Phase 0 — Repository Blueprint
+Status: COMPLETE
 
 ### Phase 1 — Application Foundation
 Status: COMPLETE
 
+- FastAPI backend
+- React + TypeScript + Vite frontend
+- health endpoint and foundation tests
+- merged into `main`
+
 ### Phase 2 — PostgreSQL + pgvector
-Status: IN PROGRESS (verification pending)
+Status: COMPLETE
 
-### Phase 3 — Document Ingestion
-Status: IN PROGRESS (verification pending)
+- PostgreSQL and pgvector schema
+- SQLAlchemy 2.x models and sessions
+- Alembic migration creates the vector extension and tables
+- CI migration verified against PostgreSQL + pgvector
 
-### Phase 4 — RAG Pipeline
-Status: NEXT
+### Phase 3 — Document Ingestion + RAG Foundation
+Status: COMPLETE
 
-### Phase 5 — LLM Integration
+- PDF, TXT, and Markdown ingestion
+- deterministic chunking and embedding abstraction
+- vector retrieval and grounded answer generation
+- traceable source references and minimal frontend vertical slice
+
+### Phase 4 — Agentic Workflows + Tool Calling
 Status: PLANNED
 
-### Phase 6 — Agent Orchestration
-Status: PLANNED
+## Phase 2 + 3 Verification
 
-### Phase 7 — Tool Calling
-Status: PLANNED
+Verified by the GitHub Actions workflow for PR #3:
 
-### Phase 8 — Analytics + Chart Tools
-Status: PLANNED
+| Group | Count | Check | Result |
+|---|---:|---|---|
+| PostgreSQL | 1 | PostgreSQL + pgvector service readiness | PASS |
+| Database | 2 | Alembic `upgrade head` against CI database | PASS |
+| Backend | 3 | `app.main` import smoke test | PASS |
+| Backend | 4 | Full backend pytest suite, including PostgreSQL integration tests | PASS |
+| Frontend | 5 | Production TypeScript/Vite build | PASS |
+| CI | 6 | Workflow run 37117613154 (PR) and 37117610042 (push) | PASS |
 
-### Phase 9 — React AI Interface
-Status: PLANNED
+The retrieval integration test uses real PostgreSQL/pgvector cosine search. A function-scoped autouse fixture clears document and chunk rows before and after each test because API tests perform committed writes; the real retrieval test and production retrieval code remain unchanged by the isolation fix.
 
-### Phase 10 — Authentication + Conversation History
-Status: PLANNED
+## Scope Boundaries
 
-### Phase 11 — Dockerization
-Status: PLANNED
+Not implemented in this phase:
 
-### Phase 12 — Testing + CI/CD
-Status: PLANNED
-
-### Phase 13 — Cloud Deployment
-Status: PLANNED
-
-### Phase 14 — Production Polish
-Status: PLANNED
-
-## Phase 2 + 3 — Database and RAG Foundation
-Status: IN PROGRESS (verification pending)
-
-### Implementation Summary
-- Added SQLAlchemy 2.x database layer with engine/session/dependency wiring.
-- Added PostgreSQL + pgvector schema (`documents`, `document_chunks`) with indexes/constraints.
-- Added Alembic configuration and initial migration that creates `vector` extension and tables.
-- Added ingestion pipeline for PDF/TXT/Markdown extraction, deterministic chunking, embedding, and persistence.
-- Added retrieval and RAG services with grounded context assembly and source references.
-- Added API endpoints: `POST /documents`, `GET /documents`, and `POST /chat`.
-- Extended frontend with upload/list/query/source display flow.
-- Extended `.env.example` and Docker Compose with pgvector PostgreSQL service.
-- Added backend test coverage for extraction, chunking, embeddings, RAG, retrieval, API, settings, and DB integration.
-
-### Verification Status
-- Local runtime execution is unavailable in this tool-only session.
-- CI workflow update for postgres-backed migration + test execution is still pending due repeated write failures on workflow update path.
-- Therefore Phase 2/3 verification is not yet complete.
-
-### Known Gaps
-- GitHub workflow update (`.github/workflows/ci.yml`) has not been committed in this session despite multiple safe retries.
-- CI pass/fail status for the new Phase 2/3 implementation is not yet available.
-
-### Next Required Step
-- Update workflow file to run Alembic migration + backend tests against PostgreSQL + pgvector and rerun CI.
+- autonomous agents or multi-agent workflows
+- tool calling
+- authentication or authorization
+- persistent conversations or complex conversation memory
+- production deployment
 
 ## Notes
 
-- This file tracks actual project state.
-- Planned functionality remains planned until implementation and verification are both complete.
+- This file tracks implemented and verified state.
+- Phase 4 remains planned and has not been started.
