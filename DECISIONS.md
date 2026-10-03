@@ -58,6 +58,27 @@ This file is a lightweight Architecture Decision Record (ADR) log for key projec
 - **Alternatives considered:** External CI service from project start (deferred as unnecessary complexity).
 - **Status:** Accepted
 
+## ADR-009 — Backend configuration via pydantic-settings
+
+- **Decision:** Use `pydantic-settings` for backend runtime configuration.
+- **Reason:** Typed environment loading keeps config explicit and test-friendly.
+- **Alternatives considered:** Direct `os.getenv` across modules (rejected due to weaker structure and maintainability).
+- **Status:** Accepted
+
+## ADR-010 — Minimal frontend API client abstraction
+
+- **Decision:** Add a lightweight frontend API client module exposing `baseUrl` from `VITE_API_BASE_URL`.
+- **Reason:** Keeps UI components decoupled from raw environment access and prepares clean service growth.
+- **Alternatives considered:** Reading `import.meta.env` directly in each component (rejected for duplication and weaker boundaries).
+- **Status:** Accepted
+
+## ADR-011 — Preserve future boundary packages without feature logic
+
+- **Decision:** Create empty package seams for `agents`, `tools`, `services`, `db`, and `models` in backend.
+- **Reason:** Supports target architecture while keeping Phase 1 scope limited to foundation.
+- **Alternatives considered:** Omitting package seams entirely (deferred to reduce future restructuring overhead).
+- **Status:** Accepted
+
 ## Notes
 
 - Decisions are expected to evolve as implementation proceeds.

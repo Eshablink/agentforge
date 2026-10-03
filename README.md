@@ -6,8 +6,21 @@ Production-style full-stack agentic AI platform for source-grounded conversation
 
 | Group | Count | Item | Status |
 |---|---:|---|---|
-| Project Status | 1 | Repository setup and foundational documentation | Complete |
-| Project Status | 2 | Application runtime features | Planned |
+| Project Status | 1 | Phase 0 — Repository Setup | Complete |
+| Project Status | 2 | Phase 1 — Application Foundation | Complete |
+| Project Status | 3 | Advanced AI capabilities (RAG/agents/tool-calling) | Planned |
+
+## Implemented in Phase 1
+
+| Group | Count | Capability |
+|---|---:|---|
+| Backend Foundation | 1 | FastAPI application scaffold under `backend/app` |
+| Backend Foundation | 2 | `GET /health` endpoint |
+| Backend Foundation | 3 | Backend test suite for startup and health response |
+| Frontend Foundation | 4 | React + TypeScript + Vite scaffold under `frontend/` |
+| Frontend Foundation | 5 | Frontend API base URL configuration via `VITE_API_BASE_URL` |
+| Project Setup | 6 | Root `.env.example` and Docker Compose wiring for frontend/backend |
+| Project Setup | 7 | Container build files for backend and frontend |
 
 ## Planned Capabilities
 
@@ -24,7 +37,7 @@ Production-style full-stack agentic AI platform for source-grounded conversation
 | Visualization | 9 | Chart and visualization generation |
 | Response Quality | 10 | Source-grounded answer synthesis |
 
-## Technology Stack (Direction)
+## Technology Stack
 
 ### Frontend
 
@@ -43,7 +56,7 @@ Production-style full-stack agentic AI platform for source-grounded conversation
 | Backend | 3 | Pydantic |
 | Backend | 4 | REST APIs |
 
-### AI & Data
+### AI & Data (Planned beyond Phase 1)
 
 | Group | Count | Stack Item |
 |---|---:|---|
@@ -61,6 +74,57 @@ Production-style full-stack agentic AI platform for source-grounded conversation
 | DevOps | 1 | Docker |
 | DevOps | 2 | GitHub Actions |
 | DevOps | 3 | Cloud deployment |
+
+## Local Setup
+
+### 1) Environment
+
+```bash
+cp .env.example .env
+```
+
+### 2) Backend
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
+
+Backend URL: `http://localhost:8000`
+Health endpoint: `http://localhost:8000/health`
+
+### 3) Backend tests
+
+```bash
+cd backend
+pytest
+```
+
+### 4) Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend URL: `http://localhost:5173`
+
+### 5) Frontend build
+
+```bash
+cd frontend
+npm run build
+```
+
+### 6) Docker Compose
+
+```bash
+docker compose up --build
+```
 
 ## High-Level Architecture
 
@@ -82,15 +146,15 @@ PostgreSQL + pgvector + External APIs
 Source-grounded Response to React UI
 ```
 
-See `ARCHITECTURE.md` for full layer responsibilities and boundaries.
+See `ARCHITECTURE.md` for detailed boundaries and layer responsibilities.
 
 ## Development Roadmap
 
 | Group | Count | Phase | Status |
 |---|---:|---|---|
 | Roadmap | 0 | Phase 0 — Repository Setup | COMPLETE |
-| Roadmap | 1 | Phase 1 — Application Foundation | NEXT |
-| Roadmap | 2 | Phase 2 — PostgreSQL + pgvector | PLANNED |
+| Roadmap | 1 | Phase 1 — Application Foundation | COMPLETE |
+| Roadmap | 2 | Phase 2 — PostgreSQL + pgvector | NEXT |
 | Roadmap | 3 | Phase 3 — Document Ingestion | PLANNED |
 | Roadmap | 4 | Phase 4 — RAG Pipeline | PLANNED |
 | Roadmap | 5 | Phase 5 — LLM Integration | PLANNED |

@@ -2,14 +2,14 @@
 
 ## Current Phase
 
-Phase 0 — Repository Setup
+Phase 1 — Application Foundation
 
 Status: COMPLETE
 
 ## Development Roadmap
 
 ### Phase 1 — Application Foundation
-Status: NEXT
+Status: COMPLETE
 
 - FastAPI backend
 - React + TypeScript frontend
@@ -18,7 +18,7 @@ Status: NEXT
 - basic project structure
 
 ### Phase 2 — PostgreSQL + pgvector
-Status: PLANNED
+Status: NEXT
 
 ### Phase 3 — Document Ingestion
 Status: PLANNED
@@ -55,6 +55,40 @@ Status: PLANNED
 
 ### Phase 14 — Production Polish
 Status: PLANNED
+
+## Phase 1 — Application Foundation
+Status: COMPLETE
+
+### Implementation Summary
+- Added modular FastAPI backend scaffold under `backend/app` with clear boundary packages.
+- Implemented `GET /health` endpoint with typed response schema.
+- Added backend environment settings module (`pydantic-settings`) for foundational configuration.
+- Added pytest coverage for app startup metadata, health status code, and response contract.
+- Added React + TypeScript + Vite frontend scaffold with simple AgentForge foundation UI.
+- Added frontend API configuration abstraction using `VITE_API_BASE_URL`.
+- Added root `.env.example`, `.gitignore`, Dockerfiles, and docker-compose setup for frontend/backend.
+
+### Tests
+- Backend tests defined: `cd backend && pytest`.
+- Frontend build validation defined: `cd frontend && npm run build`.
+
+### Verification Status
+- Code-level checks completed for imports, project structure, and environment-based configuration boundaries.
+- Runtime command execution could not be performed in this tool-only environment.
+- Commands are documented in README for deterministic local/CI execution.
+
+### Important Decisions
+- Kept `api_prefix` environment-configurable from day one.
+- Introduced minimal frontend service abstraction without making live API calls yet.
+- Added only lightweight scaffolding for future packages (`agents`, `tools`, `services`, `db`) without future-phase behavior.
+
+### Known Limitations
+- No RAG/embeddings/vector search, agent orchestration, or tool-calling logic yet (future phases).
+- No authentication or conversation persistence yet (future phases).
+- No CI workflow file committed due repeated unknown write failures on `.github/workflows/*` path in this session.
+
+### Next Phase
+- Phase 2 — PostgreSQL + pgvector
 
 ## Phase Completion Template (Use for future completed phases)
 
