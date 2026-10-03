@@ -31,6 +31,13 @@ class Settings(BaseSettings):
 
     llm_provider: str = "fake"
     llm_model: str = LLM_MODEL_DEFAULT
+    auth_secret: str = "development-only-change-me"
+    session_ttl_seconds: int = 3600
+    password_min_length: int = 12
+    max_agent_steps: int = 5
+    max_tool_calls: int = 4
+    max_conversation_messages: int = 20
+    max_conversation_context_chars: int = 8000
 
     rag_top_k_default: int = 5
     rag_top_k_max: int = 10
@@ -50,9 +57,22 @@ class Settings(BaseSettings):
     def validate_embedding_dimension(cls, value: int) -> int:
         if value not in SUPPORTED_EMBEDDING_DIMENSIONS:
             supported = ", ".join(str(item) for item in sorted(SUPPORTED_EMBEDDING_DIMENSIONS))
-            raise ValueError(
-                f"Unsupported embedding_dimension {value}. Supported dimensions: {supported}"
-            )
+            raise ValueError(f"Unsupported embedding_dimension {value}. Supported dimensions: {supported}")
+        return value
+
+    @field_validator("auth_secret")
+    @classmethod
+    def validate_auth_secret(cls, value: str, info) -> str:
+        env_name = str(info.data.get("app_env", "development")).lower()
+        if env_name == "production" and (len(value) < 32 or value == "development-only-change-me"):
+            raise ValueError("AUTH_SECRET must be a unique value of at least 32 characters in production")
+        return value
+
+    @field_validator("session_ttl_seconds", "max_agent_steps", "max_tool_calls", "max_conversation_messages", "max_conversation_context_chars")
+    @classmethod
+    def positive_limits(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError("configured limits must be positive")
         return value
 
     @property
