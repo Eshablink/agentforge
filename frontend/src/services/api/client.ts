@@ -1,4 +1,4 @@
-import type { AgentChatResponse, ChatResponse, ConversationSummary, DocumentSummary, SessionResponse, SourceReference, UserIdentity } from "../../types/app";
+import type { AgentChatResponse, ChatResponse, ConversationSummary, DocumentSummary, SessionResponse, UserIdentity } from "../../types/app";
 
 const FALLBACK_API_BASE_URL = "http://localhost:8000";
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
@@ -24,33 +24,33 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const apiClient = {
   baseUrl,
   register(email: string, password: string): Promise<UserIdentity> {
-    return request("/auth/register", { method: "POST", body: JSON.stringify({ email, password }) });
+    return request<UserIdentity>("/auth/register", { method: "POST", body: JSON.stringify({ email, password }) });
   },
   login(email: string, password: string): Promise<SessionResponse> {
-    return request("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    return request<SessionResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
   },
   async logout(): Promise<void> {
     try { await request<void>("/auth/logout", { method: "POST" }); }
     finally { setAccessToken(null); }
   },
-  listDocuments(): Promise<DocumentSummary[]> { return request("/documents/me"); },
+  listDocuments(): Promise<DocumentSummary[]> { return request<DocumentSummary[]>("/documents/me"); },
   async uploadDocument(file: File): Promise<DocumentSummary> {
     const form = new FormData(); form.append("file", file);
-    return request("/documents/me", { method: "POST", body: form });
+    return request<DocumentSummary>("/documents/me", { method: "POST", body: form });
   },
   askQuestion(question: string, topK = 5): Promise<ChatResponse> {
-    return request("/me/chat", { method: "POST", body: JSON.stringify({ question, top_k: topK }) });
+    return request<ChatResponse>("/me/chat", { method: "POST", body: JSON.stringify({ question, top_k: topK }) });
   },
   agentChat(question: string, conversationId?: string): Promise<AgentChatResponse> {
-    return request("/agent/chat", { method: "POST", body: JSON.stringify({ question, conversation_id: conversationId ?? null }) });
+    return request<AgentChatResponse>("/agent/chat", { method: "POST", body: JSON.stringify({ question, conversation_id: conversationId ?? null }) });
   },
-  listConversations(): Promise<ConversationSummary[]> { return request("/conversations"); },
+  listConversations(): Promise<ConversationSummary[]> { return request<ConversationSummary[]>("/conversations"); },
   createConversation(title: string): Promise<ConversationSummary> {
-    return request("/conversations", { method: "POST", body: JSON.stringify({ title }) });
+    return request<ConversationSummary>("/conversations", { method: "POST", body: JSON.stringify({ title }) });
   },
-  getConversation(id: string): Promise<ConversationSummary> { return request(`/conversations/${id}`); },
+  getConversation(id: string): Promise<ConversationSummary> { return request<ConversationSummary>(`/conversations/${id}`); },
   sendConversationMessage(id: string, content: string): Promise<ConversationSummary> {
-    return request(`/conversations/${id}/messages`, { method: "POST", body: JSON.stringify({ content }) });
+    return request<ConversationSummary>(`/conversations/${id}/messages`, { method: "POST", body: JSON.stringify({ content }) });
   },
-  deleteConversation(id: string): Promise<void> { return request(`/conversations/${id}`, { method: "DELETE` }); },
+  deleteConversation(id: string): Promise<void> { return request<void>(`/conversations/${id}`, { method: "DELETE" }); },
 };
