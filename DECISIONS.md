@@ -1,63 +1,73 @@
 # AgentForge Decisions
 
-This file records accepted architecture decisions for the current project. See `PROGRESS.md` for phase status and verification.
+This file records the decisions implemented in the current Phase 0–6 foundation. Completion/verification evidence is tracked in `PROGRESS.md` and PR #6. Passing CI establishes a tested engineering foundation; it does not mean the application is deployed to production.
 
 ## ADR-001 — React + TypeScript + Vite
-- **Decision:** Use React, TypeScript, and Vite for the frontend.
-- **Reason:** Component-driven UI, typed API boundaries, and fast build/development feedback.
-- **Status:** Accepted; implemented in Phase 1.
+- **Decision:** Use React, TypeScript and Vite for the browser UI.
+- **Reason:** Typed interfaces and incremental application development.
+- **Status:** Accepted; implemented.
 
 ## ADR-002 — FastAPI + Python
-- **Decision:** Use FastAPI for the backend REST API and Python service layer.
-- **Reason:** Typed validation and clear API/service boundaries.
-- **Status:** Accepted; implemented in Phase 1 and extended in Phase 3.
+- **Decision:** Use FastAPI and typed Pydantic schemas for API contracts and service composition.
+- **Reason:** Explicit routing, validation, and separation from frontend behavior.
+- **Status:** Accepted; implemented.
 
 ## ADR-003 — PostgreSQL + pgvector
-- **Decision:** Use PostgreSQL as the relational database and pgvector for vector storage/search.
-- **Reason:** Keep document metadata, chunks, and embedding vectors in one ACID datastore.
-- **Alternatives:** SQLite or a separate vector store; not used for runtime/integration verification.
-- **Status:** Accepted; implemented and verified in Phase 2.
+- **Decision:** Use PostgreSQL as relational store and pgvector for embeddings/cosine similarity.
+- **Reason:** Keep documents, chunks, ownership, conversations and vectors in one ACID database.
+- **Status:** Accepted; phases 2–6 migrations and integration tests use PostgreSQL + pgvector.
 
-## ADR-004 — SQLAlchemy 2.x declarative base and model registration
-- **Decision:** Define the declarative base independently in `app.db.base`; models import the base, while Alembic imports mapped model modules explicitly.
-- **Reason:** Avoid circular imports and ensure `Base.metadata` contains all mapped entities during migrations.
-- **Status:** Accepted; implemented and migration-verified.
+## ADR-004 — SQLAlchemy 2.x declarative base and Alembic registration
+- **Decision:** Define a standalone `DeclarativeBase` in `app.db.base`; import model modules explicitly for Alembic metadata.
+- **Reason:** Avoid circular imports and make migrations deterministic.
+- **Status:** Accepted; implemented.
 
-## ADR-005 — Versioned Alembic migrations
-- **Decision:** Manage PostgreSQL schema and pgvector extension with Alembic migrations.
-- **Reason:** Deterministic fresh database initialization and auditable schema changes.
-- **Status:** Accepted; `upgrade head` verified against PostgreSQL + pgvector in CI.
+## ADR-005 — Fixed embedding dimension and versioned migrations
+- **Decision:** Maintain the supported 1536-dimensional embedding schema and reject unsupported runtime dimensions; do not generate migrations from environment-specific schema values.
+- **Reason:** Avoid database/vector shape drift and make upgrades reproducible.
+- **Status:** Accepted; implemented.
 
-## ADR-006 — Fixed supported embedding dimension
-- **Decision:** Support 1536 dimensions for the Phase 2–3 schema. Runtime settings validate this supported dimension; migration schema uses the same authoritative project constant, not arbitrary environment-driven migration logic.
-- **Reason:** Prevent runtime/model/database vector dimensions from silently diverging.
-- **Status:** Accepted; implemented and migration-verified.
+## ADR-006 — Provider abstractions and test fakes
+- **Decision:** Keep embedding, answer-generation, and agent-decision providers behind application-independent interfaces; CI uses deterministic fakes.
+- **Reason:** Core services stay testable without paid APIs and provider output remains untrusted.
+- **Status:** Accepted; implemented.
 
-## ADR-007 — Provider abstractions and deterministic test fakes
-- **Decision:** Keep embedding and LLM providers behind service abstractions; use fake providers for automated tests.
-- **Reason:** Avoid paid API calls and make CI deterministic while preserving a provider extension point.
-- **Status:** Accepted; implemented and CI-verified.
+## ADR-007 — Bounded registered-tool agent, no general code executor
+- **Decision:** Agent decisions use typed structured schemas. Only explicitly registered tools execute: existing retrieval-backed `document_search`, explicit Decimal calculator, and deterministic date-offset utility.
+- **Reason:** A small auditable tool surface with schema validation, allowlisting and bounded outputs is safer than arbitrary Python/shell/SQL execution.
+- **Alternatives:** LangChain/LangGraph and custom unrestricted tool execution; no orchestration framework is required for the current simple loop, and arbitrary execution is rejected.
+- **Status:** Accepted; implemented and covered by CI tests.
 
-## ADR-008 — Synchronous ingestion for the first verified vertical slice
-- **Decision:** Ingest synchronously: upload → extract → deterministic chunk → embed → persist in one database transaction.
-- **Reason:** Keep the first feature slice easy to understand and verify; add background work only with a future scoped requirement.
-- **Status:** Accepted; implemented in Phase 3. Persistence failures roll back document/chunk changes and surface controlled application errors.
+## ADR-008 — Operational trace, not chain-of-thought
+- **Decision:** Store/return bounded operational event names, tool names and safe status details; never persist hidden reasoning or secrets.
+- **Reason:** Debuggability with less sensitive model/user data exposure.
+- **Status:** Accepted; implemented.
 
-## ADR-009 — pgvector cosine retrieval with provenance
-- **Decision:** Rank chunks using PostgreSQL/pgvector cosine distance and return document/chunk source references with grounded answers.
-- **Reason:** Keep retrieval close to persisted data and make answer evidence traceable.
-- **Status:** Accepted; implemented and exercised by PostgreSQL integration tests.
+## ADR-009 — Persistent user-owned conversations with bounded recent memory
+- **Decision:** Store conversations/messages in PostgreSQL; include only a bounded recent message window from the conversation being updated.
+- **Reason:** Multi-turn continuity without unbounded context growth or cross-conversation leakage.
+- **Status:** Accepted; implemented.
 
-## ADR-010 — Isolate database-writing tests
-- **Decision:** Clear document and chunk rows before and after each PostgreSQL test that uses shared test storage.
-- **Reason:** API integration tests commit transactions, so per-test rollback alone cannot undo their writes or prevent cross-test retrieval contamination.
-- **Status:** Accepted; verified by passing full pytest suite. The real pgvector retrieval test remains intact.
+## ADR-010 — Bearer sessions with hashed passwords and revocation
+- **Decision:** Hash passwords with salted PBKDF2-SHA256; issue opaque random bearer tokens, store only token hashes, and enforce session expiry/revocation server-side.
+- **Reason:** Avoid plaintext credentials and allow sessions to be invalidated without retaining raw tokens.
+- **Status:** Accepted; implemented. Deployment must use HTTPS and secret management.
 
-## ADR-011 — Docker Compose startup and CI
-- **Decision:** Use `pgvector/pgvector:pg16`; wait for database health before backend startup, apply Alembic migrations before serving, and verify migrations/import/tests/frontend build in GitHub Actions.
-- **Reason:** Reliable fresh local startup and reproducible CI with the actual data stack.
-- **Status:** Accepted; Phase 2–3 CI verified. See `PROGRESS.md` for the verified run references.
+## ADR-011 — Per-user authorization and legacy compatibility
+- **Decision:** Store document owner IDs and scope private document retrieval and conversation access to authenticated user identity. Preserve legacy Phase 3 routes for records with no owner; exclude owned rows from their queries.
+- **Reason:** Maintain existing single-user behavior without exposing new users’ private records.
+- **Status:** Accepted; implemented and exercised by PostgreSQL ownership tests.
 
-## Deferred scope
+## ADR-012 — Test isolation across committed database writes
+- **Decision:** Clear test data before and after tests against the shared PostgreSQL test database, in reverse FK dependency order.
+- **Reason:** API tests commit transactions; per-test rollback alone cannot undo other sessions’ commits.
+- **Status:** Accepted; implemented.
 
-Autonomous agents, multi-agent workflows, dynamic tool calling, authentication/authorization, multi-tenancy, billing, complex conversation history, and production deployment remain unimplemented. Do not treat prior long-term technology direction as shipped functionality. Phase 4 has not started.
+## ADR-013 — Docker and GitHub Actions
+- **Decision:** Use PostgreSQL health-gated startup, Alembic-before-Uvicorn, and Actions checks for PostgreSQL/pgvector, migration, import, backend tests, and frontend build.
+- **Reason:** Reproducible fresh initialization and test against the actual storage engine.
+- **Status:** Accepted; implemented and green on the latest audited PR commit/run recorded in `PROGRESS.md`.
+
+## Deferred decisions
+
+Not implemented: SSO/MFA, formal rate limiting, cloud deployment/operations, billing, advanced analytics, or any Phase 7+ scope. This repository is not represented as deployed production software.
