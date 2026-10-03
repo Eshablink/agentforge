@@ -1,6 +1,14 @@
+import os
+
 from fastapi.testclient import TestClient
 
-from app.main import app
+os.environ.setdefault(
+    "DATABASE_URL", "postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge"
+)
+os.environ.setdefault("EMBEDDING_PROVIDER", "fake")
+os.environ.setdefault("LLM_PROVIDER", "fake")
+
+from app.main import app  # noqa: E402
 
 client = TestClient(app)
 

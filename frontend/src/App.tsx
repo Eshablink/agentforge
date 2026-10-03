@@ -4,7 +4,7 @@ import { apiClient } from "./services/api/client";
 
 const appInfo: AppInfo = {
   name: "AgentForge",
-  description: "Production-style agentic AI platform foundation",
+  description: "PostgreSQL + pgvector document ingestion and RAG foundation",
 };
 
 function App() {
