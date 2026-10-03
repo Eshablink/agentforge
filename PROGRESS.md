@@ -60,27 +60,35 @@ Status: PLANNED
 Status: COMPLETE
 
 ### Implementation Summary
-- Added FastAPI backend foundation with modular package structure under `backend/app`.
-- Implemented `GET /health` with typed response schema.
-- Added backend tests covering startup metadata and health endpoint contract.
-- Added React + TypeScript + Vite frontend foundation under `frontend/`.
-- Added frontend service configuration for API base URL via `VITE_API_BASE_URL`.
-- Added root environment template (`.env.example`) and container orchestration (`docker-compose.yml`).
-- Added backend/frontend Dockerfiles and foundational project directories for future phases.
+- Added modular FastAPI backend scaffold under `backend/app` with clear boundary packages.
+- Implemented `GET /health` endpoint with typed response schema.
+- Added backend environment settings module (`pydantic-settings`) for foundational configuration.
+- Added pytest coverage for app startup metadata, health status code, and response contract.
+- Added React + TypeScript + Vite frontend scaffold with simple AgentForge foundation UI.
+- Added frontend API configuration abstraction using `VITE_API_BASE_URL`.
+- Added root `.env.example`, `.gitignore`, Dockerfiles, and docker-compose setup for frontend/backend.
 
 ### Tests
-- Backend tests (`pytest`) exist and cover health endpoint behavior.
-- Frontend build script (`tsc -b && vite build`) is configured.
-- Runtime verification commands are documented in repository setup files.
+- Backend tests defined: `cd backend && pytest`.
+- Frontend build validation defined: `cd frontend && npm run build`.
+
+### Verification Status
+- Code-level checks completed for imports, project structure, and environment-based configuration boundaries.
+- Runtime command execution could not be performed in this tool-only environment.
+- Commands are documented in README for deterministic local/CI execution.
 
 ### Important Decisions
-- Kept API prefix configurable via environment-backed settings.
-- Kept frontend API base URL externally configurable to avoid hard-coded environment coupling.
-- Preserved future-phase package seams (agents/tools/services/db) without implementing future-phase logic.
+- Kept `api_prefix` environment-configurable from day one.
+- Introduced minimal frontend service abstraction without making live API calls yet.
+- Added only lightweight scaffolding for future packages (`agents`, `tools`, `services`, `db`) without future-phase behavior.
 
-### Known Issues
-- No CI workflow is active yet for automated test/build execution.
-- Frontend currently presents a Phase 1 foundation view only (expected for this phase).
+### Known Limitations
+- No RAG/embeddings/vector search, agent orchestration, or tool-calling logic yet (future phases).
+- No authentication or conversation persistence yet (future phases).
+- No CI workflow file committed due repeated unknown write failures on `.github/workflows/*` path in this session.
+
+### Next Phase
+- Phase 2 — PostgreSQL + pgvector
 
 ## Phase Completion Template (Use for future completed phases)
 
