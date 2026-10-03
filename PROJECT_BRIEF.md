@@ -90,30 +90,31 @@ The primary objective is to build one integrated application that demonstrates e
 | Group | Count | Item | Status Notes |
 |---|---:|---|---|
 | Repository Foundation | 1 | Repository initialized | Present |
-| Repository Foundation | 2 | AGENTS.md engineering instructions | Present |
-| Repository Foundation | 3 | Minimal README baseline | Present |
-| Application Features | 4 | Runtime application features | Not implemented yet |
+| Repository Foundation | 2 | Engineering and architecture documentation | Present |
+| Application Foundation | 3 | FastAPI backend scaffold | Implemented in Phase 1 |
+| Application Foundation | 4 | `GET /health` endpoint | Implemented in Phase 1 |
+| Application Foundation | 5 | Backend tests for startup and health route | Implemented in Phase 1 |
+| Application Foundation | 6 | React + TypeScript + Vite frontend scaffold | Implemented in Phase 1 |
+| Application Foundation | 7 | Frontend/backend local environment wiring | Implemented in Phase 1 |
 
 ### Planned
 
 | Group | Count | Item | Status Notes |
 |---|---:|---|---|
-| Application Foundation | 1 | FastAPI service foundation | Planned |
-| Application Foundation | 2 | React + TypeScript frontend foundation | Planned |
-| Data Layer | 3 | PostgreSQL + pgvector integration | Planned |
-| AI Pipeline | 4 | Document ingestion + embeddings + retrieval | Planned |
-| AI Pipeline | 5 | LLM response generation | Planned |
-| Agent System | 6 | Agent orchestration and tool selection | Planned |
-| Agent System | 7 | Tool execution modules (RAG/SQL/Python/Web/Charts) | Planned |
-| Product UX | 8 | Source-grounded conversational interface | Planned |
-| Product UX | 9 | Conversation context and history | Planned |
-| Delivery | 10 | Dockerization, CI/CD, and cloud deployment | Planned |
+| Data Layer | 1 | PostgreSQL + pgvector integration | Planned (Phase 2) |
+| AI Pipeline | 2 | Document ingestion + embeddings + retrieval | Planned |
+| AI Pipeline | 3 | LLM response generation | Planned |
+| Agent System | 4 | Agent orchestration and tool selection | Planned |
+| Agent System | 5 | Tool execution modules (RAG/SQL/Python/Web/Charts) | Planned |
+| Product UX | 6 | Source-grounded conversational interface | Planned |
+| Product UX | 7 | Conversation context and history | Planned |
+| Delivery | 8 | Extended CI/CD and cloud deployment hardening | Planned |
 
-## Non-Goals for the Current Stage
+## Non-Goals at Current Completion Level
 
 | Group | Count | Non-Goal |
 |---|---:|---|
-| Current Stage Constraints | 1 | No implementation of FastAPI application features yet |
-| Current Stage Constraints | 2 | No implementation of React application features yet |
-| Current Stage Constraints | 3 | No implementation of RAG, agents, or tool calling yet |
-| Current Stage Constraints | 4 | No installation of new dependencies yet |
+| Scope Boundaries | 1 | No production RAG pipeline yet |
+| Scope Boundaries | 2 | No agent orchestration or dynamic tool-calling runtime yet |
+| Scope Boundaries | 3 | No authentication or multi-user conversation history yet |
+| Scope Boundaries | 4 | No PostgreSQL/pgvector runtime integration yet |
