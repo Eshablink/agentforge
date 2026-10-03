@@ -74,7 +74,11 @@ export function HomePage({ apiUrl, appInfo }: HomePageProps) {
 
         <section className="panel">
           <h2>1) Upload a document (PDF / TXT / Markdown)</h2>
-          <input type="file" accept=".pdf,.txt,.md,text/plain,text/markdown,application/pdf" onChange={handleUpload} />
+          <input
+            type="file"
+            accept=".pdf,.txt,.md,text/plain,text/markdown,application/pdf"
+            onChange={handleUpload}
+          />
           {uploading && <p>Uploading and processing document…</p>}
         </section>
 
