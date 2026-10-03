@@ -1,17 +1,13 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
-from typing import Any
-from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from fastapi import HTTPException
 
 from app.core.settings import get_settings
-from app.models.document import DocumentChunk
 from app.schemas.platform import AgentChatResponse, AgentEvent, AgentSource
-from app.services.agent_provider import DecisionRequest, FakeDecisionProvider, LLMDecisionProvider
-from app.services.retrieval_service import RetrievalService
+from app.services.agent_provider import DecisionRequest, LLMDecisionProvider
 from app.services.tool_registry import MAX_AGENT_STEPS, MAX_TRACE_EVENTS, MAX_TOOLS_PER_REQUEST, ToolError, ToolRegistry
 
 
@@ -22,7 +18,7 @@ class AgentResult:
     sources: list[AgentSource]
     tools_used: list[str]
     events: list[AgentEvent]
-    conversation_id: UUID | None = None
+    conversation_id: uuid.UUID | None = None
 
     def response(self) -> AgentChatResponse:
         return AgentChatResponse(answer=self.answer, answer_kind=self.answer_kind, sources=self.sources, tools_used=self.tools_used, events=self.events, conversation_id=self.conversation_id)
@@ -34,13 +30,14 @@ class AgentOrchestrationService:
         self.tools = tools
         self.settings = get_settings()
 
-    def run(self, question: str, *, context: str = "", user_id: UUID | None = None) -> AgentResult:
+    def run(self, question: str, *, context: str = "", user_id: uuid.UUID | None = None) -> AgentResult:
         events: list[AgentEvent] = [AgentEvent(event="request_received")]
         results: list[dict] = []
         tool_names: list[str] = []
-        sources: dict[str, AgentSource] = {}
-        answer = "I could not complete the request safely."
+        source_map: dict[str, AgentSource] = {}
+        answer = "I could not find enough information to answer that."
         answer_kind = "INSUFFICIENT_EVIDENCE"
+        finished = False
 
         try:
             for step in range(min(self.settings.max_agent_steps, MAX_AGENT_STEPS)):
@@ -49,43 +46,52 @@ class AgentOrchestrationService:
 
                 if decision.action in {"answer", "finish"}:
                     answer = (decision.final_response or "I could not find enough information to answer that.")[:4000]
-                    answer_kind = "DIRECT" if not results else ("RAG_GROUNDED" if any(t == "document_search" for t in tool_names) else "TOOL_DERIVED")
+                    answer_kind = "DIRECT" if not results else ("RAG_GROUNDED" if "document_search" in tool_names else "TOOL_DERIVED")
+                    finished = True
                     break
-
                 if decision.action != "tool" or not decision.tool_name:
                     raise ToolError("Invalid agent decision")
                 if len(tool_names) >= min(self.settings.max_tool_calls, MAX_TOOLS_PER_REQUEST):
                     raise ToolError("Tool-call limit reached")
+                if decision.tool_name not in self.tools.names:
+                    raise ToolError("Requested tool is not available")
 
-                events.append(AgentEvent(event="tool_selected", tool=decision.tool_name))
-                result = self.tools.execute(decision.tool_name, decision.arguments)
+                events.extend([
+                    AgentEvent(event="tool_selected", tool=decision.tool_name),
+                    AgentEvent(event="arguments_validated", tool=decision.tool_name),
+                ])
+                result = self.tools.execute(decision.tool_name, decision.arguments, user_id=user_id)
                 events.append(AgentEvent(event="tool_executed", tool=decision.tool_name, detail="success"))
                 results.append(result)
                 tool_names.append(decision.tool_name)
 
                 if decision.tool_name == "document_search":
                     for item in result.get("results", []):
-                        source = AgentSource(document_id=item["document_id"], filename=item["filename"], chunk_id=item["chunk_id"], chunk_index=item["chunk_index"], similarity=item["similarity"])
-                        sources[source.chunk_id.hex if isinstance(source.chunk_id, UUID) else str(source.chunk_id)] = source
+                        src = AgentSource(document_id=item["document_id"], filename=item["filename"], chunk_id=item["chunk_id"], chunk_index=item["chunk_index"], similarity=item["similarity"])
+                        source_map[str(src.chunk_id)] = src
 
-            else:
+                if isinstance(self.provider, __import__("app.services.agent_provider", fromlist=["FakeDecisionProvider"]).FakeDecisionProvider):
+                    if decision.tool_name == "document_search":
+                        matches = result.get("results", [])
+                        if matches:
+                            answer = "Retrieved document evidence: " + matches[0]["content"][:2000]
+                            answer_kind = "RAG_GROUNDED"
+                        else:
+                            answer = "I could not find enough information in the uploaded documents to answer that."
+                            answer_kind = "INSUFFICIENT_EVIDENCE"
+                    elif decision.tool_name == "calculator":
+                        answer = f"The result is {result['result']}."
+                        answer_kind = "TOOL_DERIVED"
+                    else:
+                        answer = f"The date is {result['date']}."
+                        answer_kind = "TOOL_DERIVED"
+                    finished = True
+                    break
+            if not finished:
                 raise ToolError("Agent step limit reached")
-
-            if results and answer_kind == "INSUFFICIENT_EVIDENCE":
-                last = results[-1]
-                if last.get("tool") == "document_search" and last.get("results"):
-                    # Fake provider completes in the next bounded decision step; fallback is cited retrieved text.
-                    answer = "Retrieved document evidence: " + last["results"][0]["content"][:2000]
-                    answer_kind = "RAG_GROUNDED"
-                elif last.get("tool") == "calculator":
-                    answer = f"The result is {last['result']}."
-                    answer_kind = "TOOL_DERIVED"
-                elif last.get("tool") == "date_offset":
-                    answer = f"The date is {last['date']}."
-                    answer_kind = "TOOL_DERIVED"
         except ToolError as exc:
             events.append(AgentEvent(event="safe_error", detail=str(exc)))
             answer = str(exc)
             answer_kind = "INSUFFICIENT_EVIDENCE"
 
-        return AgentResult(answer=answer, answer_kind=answer_kind, sources=list(sources.values())[:20], tools_used=tool_names[:MAX_TOOLS_PER_REQUEST], events=events[:MAX_TRACE_EVENTS])
+        return AgentResult(answer=answer, answer_kind=answer_kind, sources=list(source_map.values())[:20], tools_used=tool_names[:MAX_TOOLS_PER_REQUEST], events=events[:MAX_TRACE_EVENTS])
