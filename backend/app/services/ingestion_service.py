@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from dataclasses import dataclass
 
 from fastapi import UploadFile
@@ -48,6 +49,7 @@ class DocumentIngestionService:
             raise IngestionError(str(exc)) from exc
 
         document = Document(
+            id=uuid.uuid4(),
             filename=file.filename or "uploaded-document",
             content_type=(file.content_type or "application/octet-stream").lower(),
             metadata_json=extracted.metadata,
@@ -59,6 +61,7 @@ class DocumentIngestionService:
         for chunk, embedding in zip(chunks, embeddings, strict=True):
             self.db.add(
                 DocumentChunk(
+                    id=uuid.uuid4(),
                     document_id=document.id,
                     chunk_index=chunk.index,
                     content=chunk.content,
