@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     llm_provider: str = "fake"
     llm_model: str = LLM_MODEL_DEFAULT
-    auth_secret: str | None = None
     session_ttl_seconds: int = 3600
     password_min_length: int = 12
     max_agent_steps: int = 5
@@ -37,6 +36,14 @@ class Settings(BaseSettings):
     rag_top_k_max: int = 10
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+
+    @field_validator("embedding_provider", "llm_provider")
+    @classmethod
+    def validate_provider(cls, value: str) -> str:
+        provider = value.strip().lower()
+        if provider not in {"fake", "openai"}:
+            raise ValueError("provider must be either 'fake' or 'openai'")
+        return provider
 
     @field_validator("chunk_overlap")
     @classmethod
@@ -58,11 +65,9 @@ class Settings(BaseSettings):
     def validate_security_settings(self):
         production = self.app_env.lower() == "production"
         if production:
-            if not self.auth_secret or len(self.auth_secret) < 32:
-                raise ValueError("AUTH_SECRET must be configured with at least 32 characters in production")
             origins = self.cors_origin_list
             if not origins or "*" in origins:
-                raise ValueError("CORS_ORIGINS must contain explicit origins in production")
+                raise ValueError("CORS_ORIGINS must contain explicit allowed origins in production")
         if self.session_ttl_seconds < 60 or self.password_min_length < 12:
             raise ValueError("session lifetime and password minimum are below secure defaults")
         if not 1 <= self.max_agent_steps <= 5 or not 1 <= self.max_tool_calls <= 4:
