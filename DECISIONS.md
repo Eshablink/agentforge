@@ -1,113 +1,103 @@
 # AgentForge Decisions
 
-This file is a lightweight Architecture Decision Record (ADR) log for key project choices.
+This file records significant technology and architecture decisions. See `PROGRESS.md` for the current verified implementation status.
 
-## ADR-001 — React + TypeScript for Frontend
-
-- **Decision:** Use React with TypeScript for the frontend application.
-- **Reason:** Strong ecosystem, component-driven UI model, and TypeScript safety for maintainable UI/API integration.
+## ADR-001 — React + TypeScript for the Frontend
+- **Decision:** Use React with TypeScript.
+- **Reason:** Component-oriented UI and type-safe API integration.
 - **Alternatives considered:** Vanilla JavaScript SPA (rejected for weaker typing/maintainability).
-- **Status:** Accepted
+- **Status:** Accepted; implemented.
 
-## ADR-002 — FastAPI + Python for Backend
-
-- **Decision:** Use Python with FastAPI for backend APIs and service orchestration.
-- **Reason:** FastAPI provides strong performance, clear REST development flow, and excellent typing/validation support via Pydantic.
-- **Alternatives considered:** Flask (rejected due to less built-in typing/validation ergonomics).
-- **Status:** Accepted
+## ADR-002 — FastAPI + Python for the Backend
+- **Decision:** Use Python and FastAPI for HTTP APIs and service orchestration.
+- **Reason:** Clear typed REST API development and Pydantic validation.
+- **Alternatives considered:** Flask (not selected for this project).
+- **Status:** Accepted; implemented.
 
 ## ADR-003 — PostgreSQL for Relational Data
-
-- **Decision:** Use PostgreSQL as the primary relational datastore.
-- **Reason:** Reliable ACID relational storage, mature tooling, and compatibility with extension ecosystem.
-- **Alternatives considered:** SQLite for production runtime (rejected for scalability/production constraints).
-- **Status:** Accepted
+- **Decision:** Use PostgreSQL as the primary datastore.
+- **Reason:** ACID relational storage and extension ecosystem.
+- **Alternatives considered:** SQLite as production runtime (rejected; integration uses PostgreSQL).
+- **Status:** Accepted; implemented.
 
 ## ADR-004 — pgvector for Vector Search
+- **Decision:** Store embeddings in PostgreSQL using pgvector.
+- **Reason:** Keeps relational document metadata and vectors in one operational database.
+- **Alternatives considered:** Separate vector store (deferred).
+- **Status:** Accepted; implemented and tested against PostgreSQL + pgvector.
 
-- **Decision:** Use pgvector extension on PostgreSQL for embedding/vector similarity search.
-- **Reason:** Keeps relational and vector data close in one operational datastore for a small cohesive project.
-- **Alternatives considered:** Separate vector-only store (deferred to avoid early operational complexity).
-- **Status:** Accepted
+## ADR-005 — LangChain / Agent Orchestration
+- **Decision:** Agent orchestration framework is not selected or implemented in Phases 0–3.
+- **Reason:** Keep the current document-RAG vertical slice independently testable; evaluate agent needs in its own phase.
+- **Alternatives considered:** LangChain and custom orchestration; decision deferred until Phase 4 design.
+- **Status:** Deferred; earlier provisional LangChain preference is superseded for implementation purposes.
 
-## ADR-005 — LangChain for AI Orchestration
+## ADR-006 — LLM Provider Abstraction
+- **Decision:** Keep answer generation behind an LLM service/provider boundary; default provider settings may target OpenAI.
+- **Reason:** Isolates provider SDK usage and allows deterministic fake behavior in automated tests.
+- **Alternatives considered:** Direct provider calls from API routes (rejected).
+- **Status:** Accepted; current abstraction implemented. No live paid provider is required for CI.
 
-- **Decision:** Use LangChain for agentic workflow orchestration and tool-routing scaffolding.
-- **Reason:** Provides established abstractions for chains, agents, tools, and retrieval-oriented workflows.
-- **Alternatives considered:** Fully custom orchestration from day one (deferred for faster early iteration).
-- **Status:** Accepted
+## ADR-007 — Docker for Reproducible Development
+- **Decision:** Use Docker Compose for PostgreSQL/pgvector, backend, and frontend development services.
+- **Reason:** Repeatable dependency setup and startup ordering.
+- **Alternatives considered:** Host-native setup only (not selected as sole workflow).
+- **Status:** Accepted; implemented.
 
-## ADR-006 — OpenAI API for Initial LLM Integration
+## ADR-008 — GitHub Actions for Continuous Integration
+- **Decision:** Use GitHub Actions to validate database-backed backend behavior and frontend builds.
+- **Reason:** Repeatable repository-hosted verification.
+- **Alternatives considered:** External CI service (not needed).
+- **Status:** Accepted; implemented. CI provisions PostgreSQL + pgvector, migrates, imports the app, runs pytest, and builds frontend.
 
-- **Decision:** Use OpenAI API as the initial LLM provider.
-- **Reason:** Mature API surface and strong ecosystem fit for rapid implementation of chat, tool-calling, and synthesis flows.
-- **Alternatives considered:** Multi-provider support immediately (deferred to a later phase).
-- **Status:** Accepted
+## ADR-009 — Typed Backend Configuration
+- **Decision:** Use `pydantic-settings` for application configuration.
+- **Reason:** Typed environment loading and validation.
+- **Alternatives considered:** Scattered `os.getenv` access (rejected).
+- **Status:** Accepted; implemented.
 
-## ADR-007 — Docker for Reproducible Environments
+## ADR-010 — Frontend API Client Boundary
+- **Decision:** Centralize frontend API calls and API base URL handling.
+- **Reason:** Keeps components separate from raw environment configuration and HTTP details.
+- **Alternatives considered:** Direct fetch/environment access in every component (rejected).
+- **Status:** Accepted; implemented.
 
-- **Decision:** Use Docker for local and deployment environment consistency.
-- **Reason:** Reproducible builds/runs across developer machines and deployment targets.
-- **Alternatives considered:** Host-native dependency setup only (rejected for reproducibility concerns).
-- **Status:** Accepted
+## ADR-011 — SQLAlchemy Declarative Base and Package Boundaries
+- **Decision:** Define one standalone SQLAlchemy 2.x `DeclarativeBase` under `app.db.base`; ORM models import it, and Alembic imports model modules separately.
+- **Reason:** Avoid circular imports while ensuring model metadata is populated for migrations.
+- **Alternatives considered:** Importing all model modules from the base module (rejected; caused a cycle).
+- **Status:** Accepted; implemented.
 
-## ADR-008 — GitHub Actions for CI/CD
+## ADR-012 — pgvector PostgreSQL Image
+- **Decision:** Use `pgvector/pgvector:pg16` in local Compose and CI.
+- **Reason:** Provides PostgreSQL and pgvector support without a separate extension build step.
+- **Alternatives considered:** Plain PostgreSQL image with manual extension install (rejected for avoidable setup fragility).
+- **Status:** Accepted; implemented.
 
-- **Decision:** Use GitHub Actions for CI/CD automation.
-- **Reason:** Native integration with repository workflows and straightforward automation for lint/tests/build/deploy gates.
-- **Alternatives considered:** External CI service from project start (deferred as unnecessary complexity).
-- **Status:** Accepted
+## ADR-013 — Fixed Supported Embedding Dimension
+- **Decision:** Support 1536 dimensions for the current schema and default `text-embedding-3-small` model. Runtime rejects unsupported dimensions; migration schema uses the same project constant and does not vary dynamically with arbitrary runtime environment settings.
+- **Reason:** Prevent silent ORM/database vector shape mismatch.
+- **Alternatives considered:** Environment-dependent migrations (rejected; schema migrations must be deterministic).
+- **Status:** Accepted; implemented.
 
-## ADR-009 — Backend configuration via pydantic-settings
+## ADR-014 — Fake Providers for Automated Tests
+- **Decision:** Use deterministic fake embeddings and fake LLM behavior in automated tests/CI.
+- **Reason:** No paid APIs or credentials are required; tests remain repeatable.
+- **Alternatives considered:** Live provider calls in CI (rejected due to cost, secrets, and flakiness).
+- **Status:** Accepted; implemented.
 
-- **Decision:** Use `pydantic-settings` for backend runtime configuration.
-- **Reason:** Typed environment loading keeps config explicit and test-friendly.
-- **Alternatives considered:** Direct `os.getenv` across modules (rejected due to weaker structure and maintainability).
-- **Status:** Accepted
+## ADR-015 — Synchronous Ingestion for the First RAG Vertical Slice
+- **Decision:** Ingest synchronously through upload, extraction, chunking, embedding, and persistence.
+- **Reason:** Simpler initial vertical slice with clear service boundaries; transaction handling makes persistence all-or-nothing.
+- **Alternatives considered:** Queue-based async processing (deferred).
+- **Status:** Accepted; implemented.
 
-## ADR-010 — Minimal frontend API client abstraction
+## ADR-016 — Isolate PostgreSQL State Across Tests
+- **Decision:** Use function-scoped autouse cleanup of document and chunk rows before and after each test that runs in the shared PostgreSQL test database.
+- **Reason:** API tests commit real ingestion transactions; leaked records affected later vector retrieval assertions. Cleanup preserves real pgvector query execution while preventing cross-test contamination.
+- **Alternatives considered:** Rewriting retrieval query behavior for test artifacts (rejected), or SQLite test substitution (rejected).
+- **Status:** Accepted; implemented and verified in green PostgreSQL CI.
 
-- **Decision:** Add a lightweight frontend API client module exposing `baseUrl` from `VITE_API_BASE_URL`.
-- **Reason:** Keeps UI components decoupled from raw environment access and prepares clean service growth.
-- **Alternatives considered:** Reading `import.meta.env` directly in each component (rejected for duplication and weaker boundaries).
-- **Status:** Accepted
+## Phase 4 Decision Gate
 
-## ADR-011 — Preserve future boundary packages without feature logic
-
-- **Decision:** Create empty package seams for `agents`, `tools`, `services`, `db`, and `models` in backend.
-- **Reason:** Supports target architecture while keeping Phase 1 scope limited to foundation.
-- **Alternatives considered:** Omitting package seams entirely (deferred to reduce future restructuring overhead).
-- **Status:** Accepted
-
-## ADR-012 — pgvector Docker image choice
-
-- **Decision:** Use `pgvector/pgvector:pg16` for local development and CI PostgreSQL service.
-- **Reason:** Maintained Postgres + pgvector image with extension support out of the box.
-- **Alternatives considered:** Plain postgres image with manual extension install (rejected for unnecessary setup fragility).
-- **Status:** Accepted
-
-## ADR-013 — Embedding model and dimension boundary
-
-- **Decision:** Default to `text-embedding-3-small` dimension `1536` with provider and dimension centralized in settings.
-- **Reason:** Reasonable quality/cost baseline and avoids scattering model/dimension literals across code.
-- **Alternatives considered:** Hard-coding values in each service (rejected for maintainability).
-- **Status:** Accepted
-
-## ADR-014 — Deterministic fake providers in tests
-
-- **Decision:** Use deterministic fake embedding + fake LLM behavior for automated tests.
-- **Reason:** Prevents paid external API usage in CI and keeps tests deterministic/reproducible.
-- **Alternatives considered:** Live provider tests (rejected for cost, flakiness, and secret requirements).
-- **Status:** Accepted
-
-## ADR-015 — Synchronous ingestion for first vertical slice
-
-- **Decision:** Implement synchronous upload→extract→chunk→embed→persist flow in API request path.
-- **Reason:** Small, verifiable Phase 2/3 foundation with clear service boundaries; async jobs can be added later.
-- **Alternatives considered:** Queue-based async processing now (deferred to avoid premature complexity).
-- **Status:** Accepted
-
-## Notes
-
-- Decisions are expected to evolve as implementation proceeds.
-- If a decision changes, add a new ADR entry that supersedes the previous one.
+Agent workflows, dynamic tool calling, authentication, conversation memory, and deployment are not implemented by these decisions. Define explicit scope, threat boundaries, schemas, and tests before starting any such phase.
