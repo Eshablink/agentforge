@@ -9,9 +9,12 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from sqlalchemy import delete
 from sqlalchemy.engine import make_url
 
 from app.core.settings import get_settings
+from app.db.session import SessionLocal
+from app.models.document import Document, DocumentChunk
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -64,6 +67,29 @@ def prepare_postgres_and_schema() -> None:
 
     if started_container:
         subprocess.run(["docker", "rm", "-f", container_name], check=False)
+
+
+@pytest.fixture(autouse=True)
+def isolate_document_database_state() -> None:
+    """Prevent committed records from one test affecting another test's retrieval."""
+    _clear_document_data()
+    try:
+        yield
+    finally:
+        _clear_document_data()
+
+
+def _clear_document_data() -> None:
+    session = SessionLocal()
+    try:
+        session.execute(delete(DocumentChunk))
+        session.execute(delete(Document))
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 def wait_for_database(database_url: str, timeout_seconds: int = 90) -> None:
