@@ -2,9 +2,9 @@
 
 ## Current Phase
 
-Phase 2 + Phase 3 — PostgreSQL/pgvector, Document Ingestion, and RAG Foundation
+Phases 0–3 — Foundation, PostgreSQL/pgvector, Document Ingestion, and RAG Foundation
 
-Status: COMPLETE — verified by GitHub Actions on commit `7f77050e739047bc19d955cdc2498054c228b7d4`.
+Status: COMPLETE. The application, database migration, integration tests, and frontend build passed GitHub Actions on `main` after PR #3 merged.
 
 ## Development Roadmap
 
@@ -12,58 +12,38 @@ Status: COMPLETE — verified by GitHub Actions on commit `7f77050e739047bc19d95
 Status: COMPLETE
 
 ### Phase 1 — Application Foundation
-Status: COMPLETE
-
-- FastAPI backend
-- React + TypeScript + Vite frontend
-- health endpoint and foundation tests
-- merged into `main`
+Status: COMPLETE — merged to `main` in PR #2.
 
 ### Phase 2 — PostgreSQL + pgvector
-Status: COMPLETE
-
-- PostgreSQL and pgvector schema
-- SQLAlchemy 2.x models and sessions
-- Alembic migration creates the vector extension and tables
-- CI migration verified against PostgreSQL + pgvector
+Status: COMPLETE — schema, SQLAlchemy models/sessions, Alembic migration, pgvector enabled and verified.
 
 ### Phase 3 — Document Ingestion + RAG Foundation
-Status: COMPLETE
-
-- PDF, TXT, and Markdown ingestion
-- deterministic chunking and embedding abstraction
-- vector retrieval and grounded answer generation
-- traceable source references and minimal frontend vertical slice
+Status: COMPLETE — PDF/TXT/Markdown ingestion, deterministic chunks, embedding abstraction, pgvector retrieval, grounded answer abstraction, source references, and minimal frontend slice.
 
 ### Phase 4 — Agentic Workflows + Tool Calling
-Status: PLANNED
+Status: NOT STARTED.
 
-## Phase 2 + 3 Verification
+## Phase 2 + 3 Verification Evidence
 
-Verified by the GitHub Actions workflow for PR #3:
+- Pre-merge post-fix PR verification passed on commit `9099462e914c40d843f6080f96efd016802bdd80`: PR run [37117686546](https://github.com/Eshablink/agentforge/actions/runs/37117686546) and push run [37117684450](https://github.com/Eshablink/agentforge/actions/runs/37117684450).
+- Post-merge `main` verification passed on merge commit `67e983772257dc575475e86ebecbe6548c968eb9`: run [37117875205](https://github.com/Eshablink/agentforge/actions/runs/37117875205).
+- Each verification covered PostgreSQL + pgvector service readiness, Alembic migration, `app.main` import smoke test, full backend pytest (including DB integration/retrieval), and frontend production build.
 
-| Group | Count | Check | Result |
-|---|---:|---|---|
-| PostgreSQL | 1 | PostgreSQL + pgvector service readiness | PASS |
-| Database | 2 | Alembic `upgrade head` against CI database | PASS |
-| Backend | 3 | `app.main` import smoke test | PASS |
-| Backend | 4 | Full backend pytest suite, including PostgreSQL integration tests | PASS |
-| Frontend | 5 | Production TypeScript/Vite build | PASS |
-| CI | 6 | Workflow run 37117613154 (PR) and 37117610042 (push) | PASS |
+## Test Database Isolation
 
-The retrieval integration test uses real PostgreSQL/pgvector cosine search. A function-scoped autouse fixture clears document and chunk rows before and after each test because API tests perform committed writes; the real retrieval test and production retrieval code remain unchanged by the isolation fix.
+The pytest session fixture prepares PostgreSQL and applies Alembic when necessary. An autouse function-scoped fixture deletes document-chunk rows and documents before and after every test. This is required because API ingestion tests commit records. It preserves transaction rollback in tests that create their own rows and prevents shared committed records from changing vector retrieval results.
 
 ## Scope Boundaries
 
-Not implemented in this phase:
+Not implemented:
 
 - autonomous agents or multi-agent workflows
-- tool calling
+- dynamic tool calling
 - authentication or authorization
-- persistent conversations or complex conversation memory
-- production deployment
+- persistent conversation memory or multi-tenancy
+- structured database query, Python analysis, web retrieval, or chart tools
+- production deployment hardening
 
-## Notes
+## Readiness
 
-- This file tracks implemented and verified state.
-- Phase 4 remains planned and has not been started.
+The verified Phase 0–3 foundation is ready for Phase 4 planning. Phase 4 should begin with a separate explicit design/scope and threat-model pass. No Phase 4 code has been started.
