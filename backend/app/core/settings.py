@@ -1,5 +1,3 @@
-from functools import lru_cache
-
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -55,6 +53,5 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.supported_content_types.split(",") if item.strip()]
 
 
-@lru_cache
 def get_settings() -> Settings:
     return Settings()
