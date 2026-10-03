@@ -18,8 +18,8 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.db.base import Base
 from app.core.settings import get_settings
+from app.db.base import Base
 
 settings = get_settings()
 
@@ -47,6 +47,7 @@ class DocumentChunk(Base):
     __table_args__ = (
         UniqueConstraint("document_id", "chunk_index", name="uq_document_chunk_index"),
         Index("ix_document_chunks_document_id", "document_id"),
+        Index("ix_document_chunks_embedding", "embedding", postgresql_using="ivfflat"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
