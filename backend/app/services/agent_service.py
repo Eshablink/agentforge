@@ -3,8 +3,6 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass
 
-from fastapi import HTTPException
-
 from app.core.settings import get_settings
 from app.schemas.platform import AgentChatResponse, AgentEvent, AgentSource
 from app.services.agent_provider import DecisionRequest, LLMDecisionProvider
@@ -35,7 +33,7 @@ class AgentOrchestrationService:
         results: list[dict] = []
         tool_names: list[str] = []
         source_map: dict[str, AgentSource] = {}
-        answer = "I could not find enough information to answer that."
+        answer = "I could not complete the request safely."
         answer_kind = "INSUFFICIENT_EVIDENCE"
         finished = False
 
@@ -70,7 +68,8 @@ class AgentOrchestrationService:
                         src = AgentSource(document_id=item["document_id"], filename=item["filename"], chunk_id=item["chunk_id"], chunk_index=item["chunk_index"], similarity=item["similarity"])
                         source_map[str(src.chunk_id)] = src
 
-                if isinstance(self.provider, __import__("app.services.agent_provider", fromlist=["FakeDecisionProvider"]).FakeDecisionProvider):
+                from app.services.agent_provider import FakeDecisionProvider
+                if isinstance(self.provider, FakeDecisionProvider):
                     if decision.tool_name == "document_search":
                         matches = result.get("results", [])
                         if matches:
@@ -92,6 +91,11 @@ class AgentOrchestrationService:
         except ToolError as exc:
             events.append(AgentEvent(event="safe_error", detail=str(exc)))
             answer = str(exc)
+            answer_kind = "INSUFFICIENT_EVIDENCE"
+        except (ValueError, RuntimeError) as exc:
+            # Provider/structured-decision errors stay server-side; never echo details into traces.
+            events.append(AgentEvent(event="safe_error", detail="Agent provider unavailable or returned an invalid decision"))
+            answer = "The agent could not complete the request safely. Please try again."
             answer_kind = "INSUFFICIENT_EVIDENCE"
 
         return AgentResult(answer=answer, answer_kind=answer_kind, sources=list(source_map.values())[:20], tools_used=tool_names[:MAX_TOOLS_PER_REQUEST], events=events[:MAX_TRACE_EVENTS])
