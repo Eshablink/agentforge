@@ -3,12 +3,17 @@ import io
 import pytest
 from fastapi import UploadFile
 from fpdf import FPDF
+from starlette.datastructures import Headers
 
 from app.services.extractor import DocumentExtractor, ExtractionError
 
 
 def _upload_file(name: str, content: bytes, content_type: str) -> UploadFile:
-    return UploadFile(filename=name, file=io.BytesIO(content), headers={"content-type": content_type})
+    return UploadFile(
+        filename=name,
+        file=io.BytesIO(content),
+        headers=Headers({"content-type": content_type}),
+    )
 
 
 def test_extract_txt_document() -> None:
