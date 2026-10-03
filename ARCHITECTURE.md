@@ -1,104 +1,73 @@
 # AgentForge Architecture
 
-## Architecture Goal
+## Current verified architecture (Phases 0–3)
 
-AgentForge is designed as a modular full-stack AI system with clear boundaries between UI, API, document processing, retrieval, and answer generation.
-
-## Current Vertical Slice (Phases 2 + 3)
-
-### Ingestion Pipeline
+AgentForge currently implements a full-stack document RAG slice. Phase 0–3 are complete; Phase 4 agentic workflow/tool-calling work has not started.
 
 ```text
-File
-  ↓
-Extractor (PDF/TXT/Markdown)
-  ↓
-Normalized Text
-  ↓
-Deterministic Chunker
-  ↓
-Embedding Service
-  ↓
-PostgreSQL + pgvector
+React + TypeScript + Vite
+          ↓ HTTP
+FastAPI routes and request schemas
+          ↓
+Application services
+  ├─ upload → extract PDF/TXT/Markdown → deterministic chunking
+  ├─ embedding provider abstraction → SQLAlchemy persistence
+  └─ query → embedding → pgvector cosine retrieval → grounded LLM answer + sources
+          ↓
+PostgreSQL + pgvector (Alembic-managed schema)
 ```
 
-### Query Pipeline
+## Ingestion and query paths
+
+### Ingestion
+
+```text
+Upload validation (type/size)
+  → PDF/TXT/Markdown extractor
+  → deterministic chunker
+  → embedding provider
+  → one SQLAlchemy transaction for document + chunks
+```
+
+The ingestion transaction is rolled back on persistence failures; APIs translate expected service errors to controlled responses. Docker Compose waits for database health and the backend container applies Alembic migrations before starting the API.
+
+### Query
 
 ```text
 Question
-  ↓
-Query Embedding
-  ↓
-pgvector Similarity Retrieval
-  ↓
-Context Construction
-  ↓
-LLM Service
-  ↓
-Answer + Source References
+  → query embedding
+  → PostgreSQL/pgvector cosine-distance ordering with bounded top_k
+  → retrieved text and document/chunk provenance
+  → grounded LLM abstraction
+  → answer plus source references (or explicit insufficient-context response)
 ```
 
-## Layer Responsibilities
+## Layer responsibilities
 
-### Frontend (React + TypeScript)
-
-| Group | Count | Responsibility |
-|---|---:|---|
-| Frontend | 1 | Upload documents |
-| Frontend | 2 | List document status/chunk count |
-| Frontend | 3 | Ask grounded questions |
-| Frontend | 4 | Render answers and cited sources |
-
-### API Layer (FastAPI)
-
-| Group | Count | Endpoint | Responsibility |
+| Group | Count | Layer/component | Responsibility |
 |---|---:|---|---|
-| API | 1 | `GET /health` | Service health check |
-| API | 2 | `POST /documents` | Upload + ingest document pipeline |
-| API | 3 | `GET /documents` | List ingested documents |
-| API | 4 | `POST /chat` | Retrieval + grounded answer generation |
+| Frontend | 1 | React + TypeScript + Vite | Upload, list documents, ask questions, display answers and sources |
+| API | 2 | FastAPI | Health, document upload/list, chat routes |
+| Services | 3 | Extractor/chunker | Supported-format extraction and deterministic text segmentation |
+| Services | 4 | Embedding/LLM abstractions | Provider boundary; fake providers keep automated tests deterministic and free of paid API requirements |
+| Services | 5 | Retrieval/RAG | pgvector cosine similarity, context assembly, answer grounding, source propagation |
+| Persistence | 6 | SQLAlchemy 2.x + PostgreSQL/pgvector | Relational metadata, chunk text/vectors, constraints and sessions |
+| Schema | 7 | Alembic | Versioned PostgreSQL schema and pgvector extension setup |
+| Delivery | 8 | Docker Compose + GitHub Actions | Reproducible local services and PostgreSQL-backed CI |
 
-### Database Layer
-
-| Group | Count | Component | Responsibility |
-|---|---:|---|---|
-| Data | 1 | PostgreSQL | Relational storage for documents and chunks |
-| Data | 2 | pgvector | Dense vector storage and similarity search |
-| Data | 3 | Alembic | Schema migrations and extension bootstrap |
-
-## Data Model (Current)
+## Data model
 
 | Group | Count | Table | Purpose |
 |---|---:|---|---|
-| Models | 1 | `documents` | Document metadata and lifecycle status |
-| Models | 2 | `document_chunks` | Chunk text, ordering, and embeddings |
+| Models | 1 | `documents` | Filename, content type, metadata, status, timestamps |
+| Models | 2 | `document_chunks` | Ordered chunk text, metadata, embedding model, pgvector embedding |
 
-## Service Boundaries
+Runtime supports the configured 1536-dimensional embedding schema and rejects unsupported dimensions; Alembic schema is fixed to that supported dimension rather than generated from arbitrary runtime environment values. Alembic imports mapped model modules explicitly; SQLAlchemy declarative base definition is independent of model packages to avoid circular imports.
 
-| Group | Count | Service | Responsibility |
-|---|---:|---|---|
-| Services | 1 | `extractor` | File-type-specific text extraction |
-| Services | 2 | `chunker` | Deterministic chunking with overlap |
-| Services | 3 | `embedding_service` | Provider-abstracted embedding generation |
-| Services | 4 | `retrieval_service` | pgvector similarity retrieval (`top_k`) |
-| Services | 5 | `llm_service` | Provider-abstracted answer generation |
-| Services | 6 | `rag_service` | Context assembly + answer + source references |
+## Verification
 
-## Retrieval and Grounding Guarantees
+Phase 2–3 passed GitHub Actions PR run 37117613154 and push run 37117610042 (PostgreSQL + pgvector readiness, Alembic upgrade, application import smoke test, full backend pytest, and frontend production build). The integration retrieval test uses actual PostgreSQL/pgvector cosine search. Test setup clears document and chunk records before and after each test to isolate API tests that commit rows.
 
-| Group | Count | Guarantee |
-|---|---:|---|
-| Grounding | 1 | Retrieval happens before generation |
-| Grounding | 2 | LLM prompt enforces context-only answering |
-| Grounding | 3 | Source metadata is returned with each answer |
-| Grounding | 4 | Insufficient context returns explicit uncertainty |
+## Explicit non-goals
 
-## Current Non-Goals
-
-| Group | Count | Not Implemented Yet |
-|---|---:|---|
-| Deferred | 1 | Autonomous agent workflows |
-| Deferred | 2 | Dynamic tool-calling runtime |
-| Deferred | 3 | Authentication/authorization |
-| Deferred | 4 | Multi-user conversation memory |
-| Deferred | 5 | Production deployment hardening |
+No autonomous agents, dynamic tool calling, authentication/authorization, multi-tenancy, complex conversation memory, billing, analytics tools, or production deployment are implemented in Phases 0–3. Do not treat these as present architecture or begin Phase 4 without explicit direction.
