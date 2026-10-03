@@ -1,108 +1,62 @@
-# AgentForge
+# AgentForge README
 
-Production-style full-stack AI platform for grounded document question answering.
+Full-stack document question answering with PostgreSQL + pgvector retrieval and grounded responses with source references.
 
-## Current Status
+## Project status
 
-| Group | Count | Item | Status |
+| Group | Count | Phase | Status |
 |---|---:|---|---|
-| Project Status | 1 | Phase 0 — Repository Setup | Complete |
-| Project Status | 2 | Phase 1 — Application Foundation | Complete |
-| Project Status | 3 | Phase 2 — PostgreSQL + pgvector Foundation | Implemented |
-| Project Status | 4 | Phase 3 — Document Ingestion + RAG Foundation | Implemented |
-| Project Status | 5 | Agentic workflows/tool calling/auth | Planned |
+| Completed | 1 | Phase 0 — Repository setup and blueprint | Complete |
+| Completed | 2 | Phase 1 — Application foundation | Complete; merged into `main` |
+| Completed | 3 | Phase 2 — PostgreSQL + pgvector foundation | Implemented and CI-verified |
+| Completed | 4 | Phase 3 — Document ingestion and RAG foundation | Implemented and CI-verified |
+| Planned | 5 | Phase 4 — Agentic workflows and tool calling | Not started |
+| Deferred | 6 | Authentication, complex conversation history, multi-tenancy, billing, production deployment | Not implemented |
 
-## Implemented Capabilities
+Phase 2–3 GitHub Actions verification passed on PR #3: run 37117613154 (PR) and 37117610042 (push), commit `7f77050e739047bc19d955cdc2498054c228b7d4`. Follow-up documentation commit `9099462e914c40d843f6080f96efd016802bdd80` also had successful PR/push CI. Subsequent code changes must be verified by fresh checks.
+
+## Implemented capabilities
 
 | Group | Count | Capability |
 |---|---:|---|
-| Backend | 1 | FastAPI application with `/health`, `/documents`, and `/chat` |
-| Backend | 2 | SQLAlchemy 2.x models for `documents` and `document_chunks` |
-| Backend | 3 | PostgreSQL + pgvector vector storage and similarity retrieval |
-| Backend | 4 | Alembic migration with `CREATE EXTENSION vector` |
-| Backend | 5 | PDF/TXT/Markdown extraction, deterministic chunking, embedding pipeline |
-| Backend | 6 | RAG service with grounded context construction and source references |
-| Frontend | 7 | Minimal upload/list/query UI for end-to-end RAG slice |
-| Tooling | 8 | Docker Compose with backend, frontend, and pgvector PostgreSQL |
+| Backend | 1 | FastAPI health, document upload/list, and chat APIs |
+| Database | 2 | SQLAlchemy 2.x, PostgreSQL + pgvector, Alembic migrations |
+| Ingestion | 3 | PDF/TXT/Markdown extraction, upload validation, deterministic chunking, embeddings, transactional persistence |
+| Retrieval/RAG | 4 | pgvector cosine similarity, bounded `top_k`, grounded context/answers, source references |
+| Frontend | 5 | React + TypeScript + Vite upload/list/query/source display vertical slice |
+| Development/CI | 6 | Docker Compose with PostgreSQL/pgvector; CI migration, import smoke test, pytest, and frontend build |
 
-## Out of Scope (Not Yet Implemented)
+Automated tests use fake embedding and LLM providers and PostgreSQL + pgvector; no paid external API is needed.
 
-| Group | Count | Item |
-|---|---:|---|
-| Deferred Scope | 1 | Autonomous/agentic workflows |
-| Deferred Scope | 2 | Tool-calling runtime |
-| Deferred Scope | 3 | Authentication/authorization |
-| Deferred Scope | 4 | Persistent conversation memory |
-| Deferred Scope | 5 | Production deployment hardening |
+## Local setup
 
-## Technology Stack
-
-### Frontend
-
-| Group | Count | Stack Item |
-|---|---:|---|
-| Frontend | 1 | React |
-| Frontend | 2 | TypeScript |
-| Frontend | 3 | Vite |
-
-### Backend
-
-| Group | Count | Stack Item |
-|---|---:|---|
-| Backend | 1 | Python |
-| Backend | 2 | FastAPI |
-| Backend | 3 | SQLAlchemy 2.x |
-| Backend | 4 | Alembic |
-| Backend | 5 | PostgreSQL + pgvector |
-
-## Environment Variables
-
-Copy and edit:
+Copy `.env.example` to `.env` and adjust values as needed:
 
 ```bash
 cp .env.example .env
 ```
 
-Key variables:
+Run the full development stack (database becomes healthy before backend migration/startup):
 
-| Group | Count | Variable | Purpose |
-|---|---:|---|---|
-| App | 1 | `APP_NAME`, `APP_ENV`, `APP_VERSION`, `API_PREFIX` | API metadata and base path |
-| Database | 2 | `DATABASE_URL` | SQLAlchemy/Alembic connection URL |
-| Database | 3 | `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_PORT` | Docker PostgreSQL configuration |
-| RAG | 4 | `EMBEDDING_PROVIDER`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSION` | Embedding config boundary |
-| RAG | 5 | `LLM_PROVIDER`, `LLM_MODEL`, `OPENAI_API_KEY` | LLM provider and model configuration |
-| RAG | 6 | `CHUNK_SIZE`, `CHUNK_OVERLAP`, `RAG_TOP_K_DEFAULT`, `RAG_TOP_K_MAX` | Retrieval and chunking behavior |
-| Upload | 7 | `MAX_UPLOAD_SIZE_BYTES`, `SUPPORTED_CONTENT_TYPES` | Upload validation controls |
+```bash
+docker compose up --build
+```
 
-## Local Setup
+Frontend: `http://localhost:5173`  
+Backend: `http://localhost:8000`
 
-### 1) Backend
+For host-based backend development, start PostgreSQL with pgvector first, install dependencies, then migrate and start the API:
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
 pip install -r requirements.txt
-```
-
-### 2) Run migrations
-
-```bash
-cd backend
 alembic -c alembic.ini upgrade head
-```
-
-### 3) Start backend
-
-```bash
-cd backend
 uvicorn app.main:app --reload
 ```
 
-Backend URL: `http://localhost:8000`
-
-### 4) Frontend
+In another terminal:
 
 ```bash
 cd frontend
@@ -110,26 +64,16 @@ npm install
 npm run dev
 ```
 
-Frontend URL: `http://localhost:5173`
-
-### 5) Docker Compose
-
-```bash
-docker compose up --build
-```
-
-Uses `pgvector/pgvector:pg16` with persistent `postgres_data` volume.
-
-## API Overview
+## API overview
 
 | Group | Count | Endpoint | Purpose |
 |---|---:|---|---|
-| Health | 1 | `GET /health` | Service readiness check |
-| Documents | 2 | `POST /documents` | Upload + extract + chunk + embed + persist |
-| Documents | 3 | `GET /documents` | List ingested documents and chunk counts |
-| RAG | 4 | `POST /chat` | Retrieve similar chunks, construct context, generate grounded answer |
+| Health | 1 | `GET /health` | API health response |
+| Documents | 2 | `POST /documents` | Upload, extract, chunk, embed, persist |
+| Documents | 3 | `GET /documents` | List documents and chunk counts |
+| RAG | 4 | `POST /chat` | Retrieve context and return grounded answer with sources |
 
-### Example chat request
+Example request:
 
 ```json
 {
@@ -138,44 +82,21 @@ Uses `pgvector/pgvector:pg16` with persistent `postgres_data` volume.
 }
 ```
 
-### Example chat response
+## Verification commands
 
-```json
-{
-  "answer": "...",
-  "sources": [
-    {
-      "document_id": "...",
-      "filename": "policy.pdf",
-      "chunk_id": "...",
-      "chunk_index": 2,
-      "similarity": 0.91
-    }
-  ],
-  "retrieved_chunks": 5
-}
-```
-
-## Testing
+CI uses PostgreSQL + pgvector and runs Alembic before the backend import and full pytest suite. Locally, with a reachable PostgreSQL + pgvector database:
 
 ```bash
 cd backend
+alembic -c alembic.ini upgrade head
+python -c "from app.main import app; print(app.title)"
 pytest
 
 cd ../frontend
+npm install
 npm run build
 ```
 
-## Architecture Summary
+## Scope boundary
 
-Ingestion pipeline:
-
-```text
-File -> Extractor -> Normalized Text -> Chunker -> Embedding Service -> PostgreSQL + pgvector
-```
-
-Query pipeline:
-
-```text
-Question -> Embedding -> Vector Retrieval -> Context -> LLM -> Answer + Sources
-```
+Phase 4 (agents and tool calling) has not started. Authentication/authorization, multi-tenancy, complex memory, analytics tools, and production deployment are also not implemented.
