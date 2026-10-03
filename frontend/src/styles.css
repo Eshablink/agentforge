@@ -13,7 +13,7 @@ main {
 }
 
 .card {
-  width: min(720px, 100%);
+  width: min(920px, 100%);
   background: #111827;
   border: 1px solid #1f2937;
   border-radius: 14px;
@@ -26,6 +26,11 @@ h1 {
   margin-bottom: 0.5rem;
 }
 
+h2,
+h3 {
+  margin-bottom: 0.5rem;
+}
+
 p {
   margin-top: 0;
   margin-bottom: 0.9rem;
@@ -35,4 +40,54 @@ p {
 .meta {
   color: #93c5fd;
   font-size: 0.9rem;
+}
+
+.panel {
+  margin-top: 1rem;
+  padding: 1rem;
+  border: 1px solid #374151;
+  border-radius: 10px;
+  background: #0f172a;
+}
+
+textarea,
+input[type="number"] {
+  width: 100%;
+  margin-top: 0.5rem;
+  margin-bottom: 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #4b5563;
+  background: #111827;
+  color: #f8fafc;
+  padding: 0.5rem;
+}
+
+button {
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #fff;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.error {
+  color: #fca5a5;
+  margin-top: 1rem;
+}
+
+ul {
+  margin: 0;
+  padding-left: 1.2rem;
 }
