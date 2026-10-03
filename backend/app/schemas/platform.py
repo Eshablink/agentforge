@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class RegisterRequest(BaseModel):
@@ -48,9 +48,9 @@ class AgentSource(BaseModel):
 class AgentChatResponse(BaseModel):
     answer: str
     answer_kind: str
-    sources: list[AgentSource] = []
-    tools_used: list[str] = []
-    events: list[AgentEvent] = []
+    sources: list[AgentSource] = Field(default_factory=list)
+    tools_used: list[str] = Field(default_factory=list)
+    events: list[AgentEvent] = Field(default_factory=list)
     conversation_id: UUID | None = None
 
 
@@ -63,6 +63,8 @@ class ConversationMessageRequest(BaseModel):
 
 
 class MessageResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     role: str
     content: str
@@ -74,4 +76,4 @@ class ConversationResponse(BaseModel):
     title: str
     created_at: datetime
     updated_at: datetime
-    messages: list[MessageResponse] = []
+    messages: list[MessageResponse] = Field(default_factory=list)
