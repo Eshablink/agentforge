@@ -58,7 +58,9 @@ class DocumentChunk(Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
     metadata_json: Mapped[dict] = mapped_column("metadata", JSON, default=dict)
     embedding_model: Mapped[str] = mapped_column(String(128), nullable=False)
-    embedding: Mapped[list[float]] = mapped_column(Vector(settings.embedding_dimension), nullable=False)
+    embedding: Mapped[list[float]] = mapped_column(
+        Vector(settings.embedding_dimension), nullable=False
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     document: Mapped[Document] = relationship(back_populates="chunks")
