@@ -6,27 +6,18 @@ Project: AgentForge
 
 Repository: Eshablink/agentforge
 
-AgentForge is a production-style full-stack agentic AI platform designed to demonstrate modern AI engineering and full-stack development.
+AgentForge is a production-style full-stack AI application. Its implemented foundation currently includes a React/TypeScript frontend, FastAPI API, PostgreSQL/pgvector persistence, document ingestion, and grounded RAG. Agent workflows and tool calling remain future phases.
 
-The long-term system will combine:
+The longer-term system may combine:
 
-- React
-- TypeScript
-- Python
-- FastAPI
-- LangChain
-- OpenAI APIs
+- React and TypeScript
+- Python and FastAPI
 - LLM integrations
-- Agentic workflows
-- Tool calling
-- RAG
-- Embeddings
-- Vector search
-- PostgreSQL
-- pgvector
-- Data analysis
-- Docker
-- GitHub Actions
+- RAG, embeddings, and vector search
+- PostgreSQL and pgvector
+- Agentic workflows and tool calling
+- Data analysis and visualization
+- Docker and GitHub Actions
 - Cloud deployment
 
 ---
@@ -78,17 +69,9 @@ Do not start future phases unless explicitly instructed.
 
 ## CURRENT DEVELOPMENT PHASE
 
-The project is currently at the repository foundation stage.
+Phases 0–3 are complete: repository foundation, application foundation, PostgreSQL + pgvector, and the document ingestion/RAG vertical slice. See PROGRESS.md for verification details.
 
-The next implementation phase will establish:
-
-- FastAPI backend
-- React + TypeScript frontend
-- Basic project structure
-- Health endpoint
-- Initial automated tests
-
-Do not implement RAG, agents, tool calling, authentication, or deployment until their respective phases are explicitly requested.
+Phase 4 (agentic workflows and tool calling) has not started. Do not implement it unless explicitly requested.
 
 ---
 
@@ -237,9 +220,9 @@ API layer
 ↓
 Application/services layer
 ↓
-Agent orchestration
+Agent orchestration (future phase)
 ↓
-Tools
+Tools (future phase)
 ↓
 Data/AI infrastructure
 
