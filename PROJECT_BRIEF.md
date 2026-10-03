@@ -1,21 +1,21 @@
 # AgentForge Project Brief
 
-## Project summary
+## Product summary
 
-AgentForge is a full-stack application for document ingestion, grounded RAG, safe registered-tool orchestration, persistent conversations and authenticated user-owned resources.
+AgentForge is a full-stack application for document ingestion, grounded RAG, safe registered-tool orchestration, persistent conversations, and authenticated user-owned resources.
 
 ## Phase status
 
 | Group | Count | Phase | Status |
 |---|---:|---|---|
-| Complete | 1 | Phase 0 — Repository blueprint | Implemented |
-| Complete | 2 | Phase 1 — FastAPI and React foundation | Implemented |
+| Complete | 1 | Phase 0 — Repository blueprint | Implemented and verified |
+| Complete | 2 | Phase 1 — FastAPI and React foundation | Implemented and verified |
 | Complete | 3 | Phase 2 — PostgreSQL + pgvector + SQLAlchemy + Alembic | Implemented and verified |
-| Complete | 4 | Phase 3 — Ingestion + vector retrieval + grounded RAG | Implemented and verified |
-| Complete | 5 | Phase 4 — Safe agent workflow and registered tools | Implemented; CI-verified on PR branch |
-| Complete | 6 | Phase 5 — Persistent conversations and bounded recent context | Implemented; CI-verified on PR branch |
-| Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented; CI-verified on PR branch |
-| Deferred | 8 | Deployment, SSO/MFA, rate limiting, billing, analytics and Phase 7+ | Not implemented |
+| Complete | 4 | Phase 3 — Document ingestion, retrieval and grounded RAG | Implemented and verified |
+| Complete | 5 | Phase 4 — Agent orchestration and safe registered tools | Implemented and verified by GitHub Actions |
+| Complete | 6 | Phase 5 — Persistent conversations and bounded memory | Implemented and verified by GitHub Actions |
+| Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented and verified by GitHub Actions |
+| Deferred | 8 | SSO/MFA, rate limiting, deployed cloud operations, billing, analytics and Phase 7+ | Not implemented |
 
 ## Implemented capabilities
 
@@ -28,14 +28,14 @@ AgentForge is a full-stack application for document ingestion, grounded RAG, saf
 | Ownership | 5 | Private user data | Owned document routes and per-user pgvector filtering; conversation queries scoped to current user |
 | UI/CI | 6 | Full-stack flow | Registration/login, owned documents, conversations, agent answers/sources/tool trace |
 
-## Verification
+## Verification record
 
-GitHub Actions run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744) passed backend and frontend checks on audit-hardened implementation commit `445eb36f512e33160df5916e45e1a8f80306903a`. Subsequent documentation commits passed CI in runs [37129523143](https://github.com/Eshablink/agentforge/actions/runs/37129523143) and [37129536765](https://github.com/Eshablink/agentforge/actions/runs/37129536765). Latest cleanup/audit commit `90d02d03c54b15e3ad571e93b5a817a9fa5b83d9` still requires its own fresh run before making a claim about that exact commit.
+GitHub Actions run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744) passed backend and frontend checks on audit-hardened application commit `445eb36f512e33160df5916e45e1a8f80306903a`. Documentation follow-up runs [37129523143](https://github.com/Eshablink/agentforge/actions/runs/37129523143) and [37129536765](https://github.com/Eshablink/agentforge/actions/runs/37129536765) passed. The latest comprehensive verification run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888) passed backend and frontend on `3ddffd055739611e405c206b17d7931d2bb93374`; the immediately following README-only commit is undergoing its own fresh CI run.
 
-CI provisions PostgreSQL + pgvector, runs Alembic upgrade and app import smoke test, the complete pytest suite, and the TypeScript/Vite production build. Tests require no paid provider keys.
+CI uses PostgreSQL + pgvector; runs Alembic upgrade, import smoke test, complete backend pytest, and frontend TypeScript/Vite production build. Fake providers make tests independent of paid API credentials.
 
 ## Security boundaries and limitations
 
-Only registered tools can execute. There is no arbitrary Python, shell, filesystem, generated SQL or unrestricted network tool. Model output is validated; chain-of-thought is not stored or returned. User-owned documents and conversations are isolated by authenticated identity. Legacy Phase 3 APIs remain for unowned legacy records only.
+Only registered tools execute. No arbitrary Python, shell, filesystem, generated SQL or unrestricted network tool. Model output is validated; chain-of-thought is neither stored nor returned. User-owned documents and conversations are isolated by authenticated user ID. Legacy Phase 3 routes are preserved for unowned records only.
 
-The browser keeps bearer tokens in memory, so reload requires sign-in. This is a production-oriented foundation, not a deployed production system. SSO/MFA, rate limiting, cloud deployment, billing, analytics, and later phases remain deferred.
+Browser bearer tokens are memory-only, so reload requires sign-in. This is a production-oriented foundation, not a deployed production service. SSO/MFA, rate limiting, cloud deployment, billing, analytics and Phase 7+ remain deferred.
