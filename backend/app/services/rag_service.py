@@ -3,7 +3,8 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.schemas.chat import ChatResponse, ChatSource
-from app.services.llm_service import LLMService
+from app.services.embedding_service import EmbeddingError
+from app.services.llm_service import LLMError, LLMService
 from app.services.retrieval_service import RetrievalService
 
 
@@ -18,7 +19,11 @@ class RAGService:
         self.llm = LLMService()
 
     def answer(self, question: str, top_k: int | None = None) -> ChatResponse:
-        retrieved = self.retrieval.search(question=question, top_k=top_k)
+        try:
+            retrieved = self.retrieval.search(question=question, top_k=top_k)
+        except EmbeddingError as exc:
+            raise RAGServiceError("Failed to generate retrieval embedding") from exc
+
         if not retrieved:
             return ChatResponse(
                 answer="I could not find enough information in the uploaded documents to answer that.",
@@ -27,7 +32,11 @@ class RAGService:
             )
 
         context = self._build_context(retrieved)
-        answer = self.llm.answer(question=question, context=context)
+
+        try:
+            answer = self.llm.answer(question=question, context=context)
+        except LLMError as exc:
+            raise RAGServiceError("Failed to generate grounded answer") from exc
 
         sources = [
             ChatSource(
