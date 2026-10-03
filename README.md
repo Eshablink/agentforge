@@ -1,6 +1,6 @@
 # AgentForge
 
-Full-stack document intelligence application: PostgreSQL/pgvector RAG, bounded registered-tool orchestration, persisted per-user conversations, and authenticated resource ownership.
+Full-stack document intelligence application: PostgreSQL/pgvector RAG, bounded registered-tool orchestration, persistent per-user conversations, and authenticated resource ownership.
 
 ## Phase status
 
@@ -17,35 +17,37 @@ Full-stack document intelligence application: PostgreSQL/pgvector RAG, bounded r
 
 ### Verification evidence
 
-- Implementation audit commit `445eb36f512e33160df5916e45e1a8f80306903a`: GitHub Actions run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744) passed backend and frontend jobs.
-- Documentation follow-up commits passed runs [37129523143](https://github.com/Eshablink/agentforge/actions/runs/37129523143), [37129536765](https://github.com/Eshablink/agentforge/actions/runs/37129536765), and [371296?](https://github.com/Eshablink/agentforge/actions).
-- Latest audit regression/hardening run should be checked on the PR before merge; only call the exact current head green when its own GitHub checks pass.
+- Phase 4–6 audit-hardened implementation commit `445eb36f512e33160df5916e45e1a8f80306903a`: GitHub Actions run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744) passed backend and frontend jobs.
+- Documentation follow-up runs [37129523143](https://github.com/Eshablink/agentforge/actions/runs/37129523143), [37129536765](https://github.com/Eshablink/agentforge/actions/runs/37129536765), and [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888) passed.
+- Latest documented implementation/docs head `3ddffd055739611e405c206b17d7931d2bb93374` passed in run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888). Later audit-only documentation commits still require their own CI result before claiming those exact commits verified.
 
-CI provisions PostgreSQL + pgvector; applies Alembic; imports the application; runs full backend pytest; and runs `npm run build` (TypeScript and Vite). Fake providers avoid paid API credentials.
+CI provisions PostgreSQL + pgvector, applies Alembic, imports the application, runs full backend pytest and builds the frontend with TypeScript and Vite. Fake providers avoid paid API credentials.
 
-## Core capabilities
+## Implemented capabilities
 
 | Group | Count | Capability |
 |---|---:|---|
-| Backend | 1 | FastAPI health, documents, RAG chat, auth, agent and conversation APIs |
+| Backend | 1 | FastAPI health, document, RAG chat, auth, agent and conversation APIs |
 | Data | 2 | PostgreSQL + pgvector, SQLAlchemy 2.x, Alembic |
-| Ingestion | 3 | PDF/TXT/Markdown extraction, deterministic chunking, embeddings, transactional persistence |
-| RAG | 4 | Owner-aware cosine retrieval, grounded context, source references, insufficient-evidence response |
-| Agent | 5 | Typed decisions; registered document search, Decimal calculator, date offset; bounded execution and operational trace |
-| Identity/memory | 6 | PBKDF2 passwords, hashed revocable expiring sessions, owner-filtered documents/conversations, bounded recent context |
-| Frontend | 7 | Registration/login, owned document upload/listing, conversations, agent responses, citations and tool trace |
+| Ingestion | 3 | PDF/TXT/Markdown extraction, deterministic chunking, embeddings and transactional persistence |
+| Retrieval/RAG | 4 | Owner-aware cosine retrieval, grounded context, sources and insufficient-evidence behavior |
+| Agent | 5 | Typed decisions; registered document search, Decimal calculator and date offset; bounded execution/trace |
+| Identity/memory | 6 | PBKDF2 password hashes, hashed revocable expiring bearer sessions, owned conversations, bounded recent context |
+| Frontend | 7 | Registration/login, owned documents, conversations, agent answer, sources, tools and trace |
 
 ## Local setup
+
+Copy `.env.example`, configure development values, then run:
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-The Compose database health check gates backend startup; backend runs Alembic migrations before starting Uvicorn. To run locally outside Compose, start PostgreSQL + pgvector, install backend dependencies, migrate, and start FastAPI. Frontend uses React + TypeScript + Vite on port 5173.
+Compose waits for PostgreSQL health; the backend applies Alembic before serving. Host-based development requires PostgreSQL + pgvector, backend dependency installation and `alembic upgrade head` before starting FastAPI. The React/TypeScript/Vite frontend defaults to port 5173.
 
-## Security boundaries
+## Security boundaries and limitations
 
-Only registered validated tools run. There is no arbitrary Python, shell, filesystem, generated SQL or unrestricted network tool. User-owned retrieval/conversation/document routes scope records by authenticated user ID. Legacy Phase 3 routes are restricted to unowned legacy records. No chain-of-thought or secret is stored in traces.
+Only registered, validated tools execute; there is no arbitrary Python, shell, filesystem, generated SQL or unrestricted network tool. User-owned documents, conversations and retrieval are filtered by authenticated identity. Legacy Phase 3 routes are restricted to unowned records. Operational traces exclude chain-of-thought and secrets.
 
-Bearer tokens are stored in browser memory; reload requires reauthentication. This is a production-oriented foundation, not a deployed production system. SSO/MFA, rate limiting, HTTPS/reverse proxy, deployment operations, billing, analytics and Phase 7+ are deferred.
+Bearer tokens are held in browser memory; reload requires reauthentication. This is a production-oriented foundation, not a deployed production service. SSO/MFA, rate limiting, HTTPS/reverse-proxy operations, cloud deployment, billing, analytics, and later phases are deferred.
