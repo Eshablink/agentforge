@@ -1,5 +1,1 @@
-from sqlalchemy.orm import DeclarativeBase
-
-
-class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy models."""
+from app.models import Document, DocumentChunk  # noqa: F401
