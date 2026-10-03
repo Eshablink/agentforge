@@ -2,29 +2,23 @@
 
 ## Current Phase
 
-Phase 1 — Application Foundation
+Phase 3 — Document Ingestion + RAG Foundation
 
-Status: COMPLETE
+Status: IN PROGRESS (verification pending)
 
 ## Development Roadmap
 
 ### Phase 1 — Application Foundation
 Status: COMPLETE
 
-- FastAPI backend
-- React + TypeScript frontend
-- health endpoint
-- initial tests
-- basic project structure
-
 ### Phase 2 — PostgreSQL + pgvector
-Status: NEXT
+Status: IN PROGRESS (verification pending)
 
 ### Phase 3 — Document Ingestion
-Status: PLANNED
+Status: IN PROGRESS (verification pending)
 
 ### Phase 4 — RAG Pipeline
-Status: PLANNED
+Status: NEXT
 
 ### Phase 5 — LLM Integration
 Status: PLANNED
@@ -56,62 +50,33 @@ Status: PLANNED
 ### Phase 14 — Production Polish
 Status: PLANNED
 
-## Phase 1 — Application Foundation
-Status: COMPLETE
+## Phase 2 + 3 — Database and RAG Foundation
+Status: IN PROGRESS (verification pending)
 
 ### Implementation Summary
-- Added modular FastAPI backend scaffold under `backend/app` with clear boundary packages.
-- Implemented `GET /health` endpoint with typed response schema.
-- Added backend environment settings module (`pydantic-settings`) for foundational configuration.
-- Added pytest coverage for app startup metadata, health status code, and response contract.
-- Added React + TypeScript + Vite frontend scaffold with simple AgentForge foundation UI.
-- Added frontend API configuration abstraction using `VITE_API_BASE_URL`.
-- Added root `.env.example`, `.gitignore`, Dockerfiles, and docker-compose setup for frontend/backend.
-
-### Tests
-- Backend tests defined: `cd backend && pytest`.
-- Frontend build validation defined: `cd frontend && npm run build`.
+- Added SQLAlchemy 2.x database layer with engine/session/dependency wiring.
+- Added PostgreSQL + pgvector schema (`documents`, `document_chunks`) with indexes/constraints.
+- Added Alembic configuration and initial migration that creates `vector` extension and tables.
+- Added ingestion pipeline for PDF/TXT/Markdown extraction, deterministic chunking, embedding, and persistence.
+- Added retrieval and RAG services with grounded context assembly and source references.
+- Added API endpoints: `POST /documents`, `GET /documents`, and `POST /chat`.
+- Extended frontend with upload/list/query/source display flow.
+- Extended `.env.example` and Docker Compose with pgvector PostgreSQL service.
+- Added backend test coverage for extraction, chunking, embeddings, RAG, retrieval, API, settings, and DB integration.
 
 ### Verification Status
-- Code-level checks completed for imports, project structure, and environment-based configuration boundaries.
-- Runtime command execution could not be performed in this tool-only environment.
-- Commands are documented in README for deterministic local/CI execution.
+- Local runtime execution is unavailable in this tool-only session.
+- CI workflow update for postgres-backed migration + test execution is still pending due repeated write failures on workflow update path.
+- Therefore Phase 2/3 verification is not yet complete.
 
-### Important Decisions
-- Kept `api_prefix` environment-configurable from day one.
-- Introduced minimal frontend service abstraction without making live API calls yet.
-- Added only lightweight scaffolding for future packages (`agents`, `tools`, `services`, `db`) without future-phase behavior.
+### Known Gaps
+- GitHub workflow update (`.github/workflows/ci.yml`) has not been committed in this session despite multiple safe retries.
+- CI pass/fail status for the new Phase 2/3 implementation is not yet available.
 
-### Known Limitations
-- No RAG/embeddings/vector search, agent orchestration, or tool-calling logic yet (future phases).
-- No authentication or conversation persistence yet (future phases).
-- No CI workflow file committed due repeated unknown write failures on `.github/workflows/*` path in this session.
-
-### Next Phase
-- Phase 2 — PostgreSQL + pgvector
-
-## Phase Completion Template (Use for future completed phases)
-
-When a phase is completed, append a section like:
-
-```markdown
-## Phase X — <Phase Name>
-Status: COMPLETE
-
-### Implementation Summary
-- ...
-
-### Tests
-- ...
-
-### Important Decisions
-- ...
-
-### Known Issues
-- ...
-```
+### Next Required Step
+- Update workflow file to run Alembic migration + backend tests against PostgreSQL + pgvector and rerun CI.
 
 ## Notes
 
 - This file tracks actual project state.
-- Planned functionality must remain marked as planned until implemented and tested.
+- Planned functionality remains planned until implementation and verification are both complete.
