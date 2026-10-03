@@ -1,63 +1,63 @@
 # AgentForge Decisions
 
-This file records accepted architecture decisions for the current project. See `PROGRESS.md` for phase status and verification.
+This file records architecture choices for the implemented Phase 0–3 document-RAG foundation. See `PROGRESS.md` for verification evidence and deferred roadmap scope.
 
 ## ADR-001 — React + TypeScript + Vite
-- **Decision:** Use React, TypeScript, and Vite for the frontend.
-- **Reason:** Component-driven UI, typed API boundaries, and fast build/development feedback.
+- **Decision:** Use React, TypeScript and Vite for the frontend.
+- **Reason:** Component-based UI with typed API boundaries.
 - **Status:** Accepted; implemented in Phase 1.
 
 ## ADR-002 — FastAPI + Python
-- **Decision:** Use FastAPI for the backend REST API and Python service layer.
-- **Reason:** Typed validation and clear API/service boundaries.
-- **Status:** Accepted; implemented in Phase 1 and extended in Phase 3.
+- **Decision:** Use FastAPI for the HTTP API and Python service layer.
+- **Reason:** Clear request validation and API/service separation.
+- **Status:** Accepted; implemented.
 
 ## ADR-003 — PostgreSQL + pgvector
-- **Decision:** Use PostgreSQL as the relational database and pgvector for vector storage/search.
-- **Reason:** Keep document metadata, chunks, and embedding vectors in one ACID datastore.
-- **Alternatives:** SQLite or a separate vector store; not used for runtime/integration verification.
-- **Status:** Accepted; implemented and verified in Phase 2.
-
-## ADR-004 — SQLAlchemy 2.x declarative base and model registration
-- **Decision:** Define the declarative base independently in `app.db.base`; models import the base, while Alembic imports mapped model modules explicitly.
-- **Reason:** Avoid circular imports and ensure `Base.metadata` contains all mapped entities during migrations.
-- **Status:** Accepted; implemented and migration-verified.
-
-## ADR-005 — Versioned Alembic migrations
-- **Decision:** Manage PostgreSQL schema and pgvector extension with Alembic migrations.
-- **Reason:** Deterministic fresh database initialization and auditable schema changes.
-- **Status:** Accepted; `upgrade head` verified against PostgreSQL + pgvector in CI.
-
-## ADR-006 — Fixed supported embedding dimension
-- **Decision:** Support 1536 dimensions for the Phase 2–3 schema. Runtime settings validate this supported dimension; migration schema uses the same authoritative project constant, not arbitrary environment-driven migration logic.
-- **Reason:** Prevent runtime/model/database vector dimensions from silently diverging.
-- **Status:** Accepted; implemented and migration-verified.
-
-## ADR-007 — Provider abstractions and deterministic test fakes
-- **Decision:** Keep embedding and LLM providers behind service abstractions; use fake providers for automated tests.
-- **Reason:** Avoid paid API calls and make CI deterministic while preserving a provider extension point.
+- **Decision:** PostgreSQL stores relational records and pgvector embeddings.
+- **Reason:** Keep document metadata, chunks and vectors in one ACID datastore.
+- **Alternatives considered:** SQLite or a separate vector store (not used for verified DB integration).
 - **Status:** Accepted; implemented and CI-verified.
 
-## ADR-008 — Synchronous ingestion for the first verified vertical slice
-- **Decision:** Ingest synchronously: upload → extract → deterministic chunk → embed → persist in one database transaction.
-- **Reason:** Keep the first feature slice easy to understand and verify; add background work only with a future scoped requirement.
-- **Status:** Accepted; implemented in Phase 3. Persistence failures roll back document/chunk changes and surface controlled application errors.
+## ADR-004 — Standalone SQLAlchemy declarative base
+- **Decision:** Define `DeclarativeBase` independently in `app.db.base`; model modules import it and Alembic imports model modules for metadata registration.
+- **Reason:** Avoid circular imports and ensure complete migration metadata.
+- **Status:** Accepted; implemented.
+
+## ADR-005 — Deterministic Alembic migrations
+- **Decision:** Use versioned migrations for the PostgreSQL schema and vector extension; do not derive schema from arbitrary runtime configuration.
+- **Reason:** Reproducible upgrades and schema history.
+- **Status:** Accepted; verified with `upgrade head` on PostgreSQL + pgvector.
+
+## ADR-006 — Fixed supported embedding dimension
+- **Decision:** Support 1536 dimensions in the current schema; runtime validation rejects unsupported dimensions and migrations use the same project constant.
+- **Reason:** Prevent model/database vector shape divergence.
+- **Status:** Accepted; implemented.
+
+## ADR-007 — Provider abstraction with deterministic test fakes
+- **Decision:** Keep embedding and answer generation behind provider abstractions; use fake providers for automated tests.
+- **Reason:** Keep CI reproducible without paid API credentials.
+- **Status:** Accepted; implemented and verified.
+
+## ADR-008 — Synchronous transactional ingestion
+- **Decision:** The first vertical slice extracts, chunks, embeds and persists in one synchronous request/transaction.
+- **Reason:** Small, verifiable initial scope; persistence failures roll back the transaction.
+- **Status:** Accepted; implemented.
 
 ## ADR-009 — pgvector cosine retrieval with provenance
-- **Decision:** Rank chunks using PostgreSQL/pgvector cosine distance and return document/chunk source references with grounded answers.
-- **Reason:** Keep retrieval close to persisted data and make answer evidence traceable.
-- **Status:** Accepted; implemented and exercised by PostgreSQL integration tests.
+- **Decision:** Use PostgreSQL/pgvector cosine distance with bounded `top_k` and return document/chunk sources.
+- **Reason:** Traceable evidence from the same persistence layer.
+- **Status:** Accepted; exercised by PostgreSQL integration tests.
 
-## ADR-010 — Isolate database-writing tests
-- **Decision:** Clear document and chunk rows before and after each PostgreSQL test that uses shared test storage.
-- **Reason:** API integration tests commit transactions, so per-test rollback alone cannot undo their writes or prevent cross-test retrieval contamination.
-- **Status:** Accepted; verified by passing full pytest suite. The real pgvector retrieval test remains intact.
+## ADR-010 — Isolate PostgreSQL-writing tests
+- **Decision:** Clear document/chunk records before and after each test against the shared test database.
+- **Reason:** API upload tests commit data; rollback of another test’s session cannot undo those commits.
+- **Status:** Accepted; validated by the passing full pytest suite.
 
-## ADR-011 — Docker Compose startup and CI
-- **Decision:** Use `pgvector/pgvector:pg16`; wait for database health before backend startup, apply Alembic migrations before serving, and verify migrations/import/tests/frontend build in GitHub Actions.
-- **Reason:** Reliable fresh local startup and reproducible CI with the actual data stack.
-- **Status:** Accepted; Phase 2–3 CI verified. See `PROGRESS.md` for the verified run references.
+## ADR-011 — Docker Compose and CI startup sequence
+- **Decision:** Use `pgvector/pgvector:pg16`; wait for DB health, apply Alembic, then start the API. CI uses the same PostgreSQL/pgvector family.
+- **Reason:** Reproducible local initialization and actual-database CI.
+- **Status:** Accepted; verified in post-merge Actions runs listed in `PROGRESS.md`.
 
-## Deferred scope
+## Deferred decisions and scope
 
-Autonomous agents, multi-agent workflows, dynamic tool calling, authentication/authorization, multi-tenancy, billing, complex conversation history, and production deployment remain unimplemented. Do not treat prior long-term technology direction as shipped functionality. Phase 4 has not started.
+No agent framework has been selected for the current implementation; LangChain/agent orchestration is deferred. Agents, tool calling, authentication, authorization, conversation memory, multi-tenancy, billing, analytics tools, and deployment are outside Phase 0–3 and remain unimplemented. Do not interpret earlier long-term technology ideas as implemented decisions.
