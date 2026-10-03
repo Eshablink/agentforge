@@ -64,10 +64,10 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def validate_security_settings(self):
         production = self.app_env.lower() == "production"
-        if production:
-            origins = self.cors_origin_list
-            if not origins or "*" in origins:
-                raise ValueError("CORS_ORIGINS must contain explicit allowed origins in production")
+        if production and self.llm_provider == "openai" and not self.openai_api_key:
+            raise ValueError("OPENAI_API_KEY is required when the production LLM provider is openai")
+        if production and (not self.cors_origin_list or "*" in self.cors_origin_list):
+            raise ValueError("CORS_ORIGINS must contain explicit allowed origins in production")
         if self.session_ttl_seconds < 60 or self.password_min_length < 12:
             raise ValueError("session lifetime and password minimum are below secure defaults")
         if not 1 <= self.max_agent_steps <= 5 or not 1 <= self.max_tool_calls <= 4:
