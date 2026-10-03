@@ -4,7 +4,7 @@ import pytest
 
 from app.services.agent_provider import AgentDecision, FakeDecisionProvider, LLMDecisionProvider
 from app.services.agent_service import AgentOrchestrationService
-from app.services.tool_registry import ToolRegistry
+from app.services.tool_registry import ToolError, ToolRegistry
 
 
 class EmptyRetrieval:
@@ -29,7 +29,6 @@ def test_calculator_tool_is_allowlisted_and_deterministic() -> None:
 
 
 def test_tool_rejects_unknown_name_and_bad_arguments() -> None:
-    from app.services.tool_registry import ToolError
     registry = ToolRegistry(EmptyRetrieval())
     with pytest.raises(ToolError):
         registry.execute("python", {"code": "print(1)"})
@@ -58,7 +57,8 @@ def test_agent_provider_error_is_controlled_and_does_not_leak_details() -> None:
     assert "sensitive provider detail" not in str(result.events)
 
 
-def test_repeated_tool_decisions_hit_configured_step_limit() -> None:
+def test_repeated_tool_decisions_hit_configured_tool_call_limit() -> None:
     result = AgentOrchestrationService(RepeatingToolProvider(), ToolRegistry(EmptyRetrieval())).run("today")
     assert result.answer_kind == "INSUFFICIENT_EVIDENCE"
-    assert any(event.detail == "Agent step limit reached" for event in result.events)
+    assert any(event.detail == "Tool-call limit reached" for event in result.events)
+    assert len(result.tools_used) == 4
