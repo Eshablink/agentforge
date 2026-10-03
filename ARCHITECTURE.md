@@ -1,74 +1,65 @@
 # AgentForge Architecture
 
-## Current verified platform architecture
+## Current verified architecture — Phases 0–6
 
-Phases 0–3 provide the document-RAG data foundation. Phases 4–6 add a safe agent path, persistent conversation state and user ownership/authentication. The latest full green application run and audit references are tracked in `PROGRESS.md` and PR #6; this is not a deployed production service.
+Phases 0–3 provide the document-RAG foundation. Phases 4–6 add registered safe tools, persistent user-owned conversations, and authentication/authorization. The implementation is CI-verified on PR #6; this is a production-oriented foundation, not a deployed service.
 
 ```text
 React + TypeScript + Vite
-        ↓ HTTP / bearer session
-FastAPI routes and schemas
+        ↓ HTTP + bearer token
+FastAPI routes and typed schemas
         ↓
-Authentication + owner authorization
+Authentication / owner authorization
         ↓
 Conversation service (bounded recent context)
         ↓
 Agent orchestration (typed decisions, bounded steps)
         ↓
-Registered tool registry
-  ├── document_search → existing owner-filtered pgvector retrieval
-  ├── calculator → explicit Decimal operations
-  └── date_offset → deterministic date utility
+Allowlisted tool registry
+  ├─ document_search → existing owner-scoped pgvector retrieval
+  ├─ calculator → explicit Decimal operations
+  └─ date_offset → deterministic utility
         ↓
 PostgreSQL + pgvector (Alembic-managed schema)
 ```
 
-## Phase 3 ingestion and retrieval (preserved)
+## Preserved Phase 3 data paths
 
-```text
-PDF/TXT/Markdown upload → validation/extraction → deterministic chunks
-  → embedding provider abstraction → transactional PostgreSQL persistence
-Question → query embedding → pgvector cosine distance → retrieved sources
-  → existing grounded LLM answer service → answer and citations
-```
+PDF/TXT/Markdown upload → validation/extraction → deterministic chunks → embedding abstraction → transactional PostgreSQL persistence. Query → embedding → the existing pgvector cosine retrieval service → context → grounded LLM answer and source references.
 
-Authenticated retrieval always includes owner filtering. Legacy Phase 3 routes query only unowned legacy documents; authenticated owned records are handled by `/documents/me`, `/me/chat`, and the authenticated agent/conversation routes. Document search invokes the shared `RetrievalService`; no duplicate vector implementation exists.
+For authenticated requests, `user_id` flows through agent → document-search tool → retrieval query, which filters on owner. Legacy `/documents` and `/chat` paths are retained for compatibility with unowned legacy rows only. The agent does not duplicate vector search.
 
-## Agent safety
+## Agent controls
 
 | Group | Count | Control |
 |---|---:|---|
-| Safety | 1 | Structured typed decision schema; provider output is untrusted and validated |
-| Safety | 2 | Registry allowlist; unknown tools are rejected |
-| Safety | 3 | Strict per-tool input validation; calculator supports explicit arithmetic only |
-| Safety | 4 | Limits on agent steps, tool calls, retrieved chunks, content, output and trace events |
-| Safety | 5 | No arbitrary Python, shell, filesystem, generated SQL, or unrestricted network tools |
-| Safety | 6 | Trace records operational events only; no hidden reasoning or credentials |
+| Agent | 1 | Structured validated provider decision; model output is untrusted |
+| Tools | 2 | Allowlist: document search, calculator, date offset |
+| Validation | 3 | Typed per-tool arguments; unknown tools and extra/invalid arguments rejected |
+| Limits | 4 | Bounded iterations, calls, `top_k`, chunks, text, tool results and trace events |
+| Execution | 5 | No arbitrary Python, shell, filesystem, generated SQL or unrestricted network |
+| Trace | 6 | Operational events only; no chain-of-thought or secrets |
 
-Providers are abstractions; CI uses the deterministic fake provider. Optional external provider configuration is environment-driven.
+The RAG tool calls the existing `RetrievalService`. Provider abstractions permit external integrations; deterministic fakes are used in CI.
 
-## Identity, ownership and memory
+## Authentication, ownership and conversation memory
 
-Passwords are salted PBKDF2-SHA256 hashes, never stored plaintext. The client receives an opaque random bearer credential; PostgreSQL stores only its hash with expiry and revocation state. Conversation/document queries enforce `user_id` from authenticated identity, not client-provided owner IDs. Conversations and messages cascade by foreign key. Context selects recent messages with deterministic ordering, then applies message-count and character bounds. Messages from unrelated conversations are never included.
+Passwords use salted PBKDF2-SHA256 hashes. Random bearer credentials are returned to the browser while only their hashes are stored; server-side expiry and revocation are checked per request. Protected document, chat, agent and conversation APIs derive user identity from the auth dependency and scope records by `user_id`; foreign conversation IDs return not found.
 
-Browser token storage is in-memory, so page reload requires sign-in. Configure explicit production CORS origins and credentials when selecting an external LLM provider. Before external deployment, provision HTTPS/reverse proxy, rate limiting, monitoring, and operational secret management.
+Messages are stored in PostgreSQL. Memory includes only a bounded recent window from the requested owned conversation, ordered by timestamp and ID and limited by message count/character count. User/assistant turns persist in one transaction. The browser stores tokens in memory, so a reload requires sign-in.
 
 ## Database and migrations
 
-| Group | Count | Table/component | Responsibility |
+| Group | Count | Table/component | Role |
 |---|---:|---|---|
-| Data | 1 | `users` | Account identity and password hash |
-| Data | 2 | `auth_sessions` | Token hash, expiry and revocation |
-| Data | 3 | `documents` | Document metadata and nullable owner for legacy rows |
-| Data | 4 | `document_chunks` | Chunk text/order and pgvector embedding |
-| Data | 5 | `conversations` | User-owned conversation metadata |
-| Data | 6 | `messages` | Ordered role/content and bounded operational metadata |
-| Schema | 7 | Alembic | Deterministic schema revisions, preserving Phase 3 pgvector |
+| Data | 1 | `users`, `auth_sessions` | User account, password hash, hashed bearer token, expiry/revocation |
+| Data | 2 | `documents`, `document_chunks` | Nullable owner for legacy rows; text, metadata and pgvector embeddings |
+| Data | 3 | `conversations`, `messages` | Per-user history and bounded operational metadata |
+| Data | 4 | SQLAlchemy 2.x + PostgreSQL/pgvector | ORM and vector queries |
+| Schema | 5 | Alembic | Deterministic incremental migrations; existing pgvector schema preserved |
 
-`app.db.base` owns the standalone declarative base. Alembic imports all model modules to register metadata without circular imports. PostgreSQL + pgvector is mandatory for integration verification; SQLite is not substituted.
+Alembic imports registered models using the standalone `app.db.base`; integration checks use PostgreSQL + pgvector, not SQLite. Docker waits for DB health and applies migrations before API startup.
 
-## Verification and boundaries
+## Verification and deferred scope
 
-The audited Phase 4–6 suite uses PostgreSQL + pgvector, migrations, an import smoke test, backend pytest and TypeScript/Vite build. The specific run/commit pairs are maintained in `PROGRESS.md` and the PR description.
-
-Not implemented: SSO/MFA, rate limiting, billing, multi-tenant administration, cloud/Kubernetes deployment, analytics platform, arbitrary code execution, or Phase 7+ work.
+The latest code and docs CI result should be taken from the current PR #6 head. CI provisions PostgreSQL + pgvector, applies Alembic, checks import, runs full pytest and builds the frontend. This project is not externally deployed. SSO/MFA, formal rate limiting, HTTPS/reverse proxy operations, monitoring, cloud/Kubernetes, billing, analytics and Phase 7+ remain deferred.
