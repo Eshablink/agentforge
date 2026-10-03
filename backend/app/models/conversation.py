@@ -24,7 +24,7 @@ class Conversation(Base):
 
     user = relationship("User", backref="conversations")
     messages: Mapped[list[Message]] = relationship(
-        back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at"
+        "Message", back_populates="conversation", cascade="all, delete-orphan", order_by="Message.created_at"
     )
 
 
@@ -40,4 +40,4 @@ class Message(Base):
     metadata_json: Mapped[dict] = mapped_column("metadata", default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    conversation: Mapped[Conversation] = relationship(back_populates="messages")
+    conversation = relationship("Conversation", back_populates="messages")
