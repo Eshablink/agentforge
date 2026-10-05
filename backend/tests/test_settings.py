@@ -1,9 +1,15 @@
-from datetime import date
-from uuid import uuid4
-
 from app.core.settings import Settings
 import pytest
 from pydantic import ValidationError
+
+
+def _production(**overrides):
+    values = dict(app_env="production", cors_origins="https://app.example",
+                  database_url="postgresql+psycopg://service:injected-secret@managed.example:5432/agentforge",
+                  llm_provider="fake", embedding_provider="fake", rate_limit_backend="redis",
+                  redis_url="rediss://redis.example:6380/0")
+    values.update(overrides)
+    return Settings(**values)
 
 
 def test_settings_validate_chunk_overlap() -> None:
@@ -19,11 +25,10 @@ def test_settings_content_types_parsing() -> None:
 
 def test_production_requires_explicit_cors_origins_and_selected_provider_credentials() -> None:
     with pytest.raises(ValidationError):
-        Settings(app_env="production", cors_origins="*")
+        _production(cors_origins="*")
     with pytest.raises(ValidationError):
-        Settings(app_env="production", cors_origins="https://app.example", llm_provider="openai", openai_api_key=None)
-    production = Settings(app_env="production", cors_origins="https://app.example", llm_provider="fake")
-    assert production.cors_origin_list == ["https://app.example"]
+        _production(llm_provider="openai", openai_api_key=None)
+    assert _production().cors_origin_list == ["https://app.example"]
 
 
 def test_agent_limits_are_bounded() -> None:
