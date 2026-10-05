@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -21,8 +21,6 @@ from app.schemas.platform import LoginRequest, RegisterRequest
 
 _bearer = HTTPBearer(auto_error=False)
 _ITERATIONS = 600_000
-# Fixed hash for absent users avoids a trivial timing oracle.
-_DUMMY_HASH = None
 
 
 def _token_hash(token: str) -> str:
@@ -108,12 +106,7 @@ def logout_user(db: Session, user: User) -> None:
 
 
 def cleanup_sessions(db: Session, *, batch_size: int = 500) -> int:
-    """Explicit maintenance command; never runs during application startup.
-
-    Only expired sessions or revoked sessions past their original expiry are
-    deleted. Active sessions cannot meet the predicate. Small batches avoid
-    long-running deletes and leave cleanup scheduling to the operator.
-    """
+    """Explicit bounded maintenance; no active sessions are deleted."""
     if not 1 <= batch_size <= 1000:
         raise ValueError("batch_size must be between 1 and 1000")
     now = datetime.now(timezone.utc)
