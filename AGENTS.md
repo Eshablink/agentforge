@@ -1,33 +1,19 @@
 # AgentForge Engineering Instructions
 
-## Project state
+## Verified baseline and current milestone
 
-Repository: `Eshablink/agentforge`.
+Phases 0–7 are COMPLETE on `main`. Phase 7 PR #9 was MERGED at `63d7d3f0d417d06b2e57fa63874824de4306450d`; main GitHub Actions run 37320957004 succeeded. Phase 8 lives on `feat/agentforge-phase-8` and is **not** a deployed service. Do not restart completed phases or merge this branch automatically.
 
-**Verified implementation:** Phases 0–6 are complete and merged to `main`. Phase 7 (production AI reliability, streaming, evaluation) is implemented on `feat/agentforge-phase-7`; confirm current GitHub Actions checks before merge. This is a production-oriented foundation, not a deployed service.
+## Preserve security and compatibility
 
-Implemented in Phases 4–6: bounded agent orchestration; structured decisions; allowlisted document-search, calculator, and date tools; PostgreSQL conversations with bounded context; PBKDF2 password hashes; hashed bearer sessions with expiry/revocation; owned documents and conversations; owner-filtered pgvector retrieval; React auth/conversation/agent UI.
+Keep PostgreSQL + pgvector, SQLAlchemy/Alembic, owner-filtered retrieval, PBKDF2-SHA256 passwords, hashed revocable bearer sessions, bounded memory, and registered typed tools. Preserve `/health`, document APIs, RAG, `/agent/chat`, conversations, authentication, and SSE. Never expose chain-of-thought or secrets; no arbitrary Python, shell, filesystem, generated SQL or unrestricted network tools.
 
-Phase 7 adds provider timeouts/retries and normalized errors, authenticated SSE streaming (typed event contract), request-ID and safe operational telemetry, per-user process-local rate limiting, resource bounds, deterministic version-controlled evaluations, CI integration, and docs. `/agent/chat` remains backward compatible.
+## Phase 8 boundaries
 
-## Engineering method
+Production config must be explicit and fail closed: PostgreSQL with non-development credentials, HTTPS CORS origins, provider selection and shared Redis rate limiting. Local `docker compose` is development only. Run migrations as a one-shot job before API startup; do not run migrations in each replica. Liveness `/health` is cheap; readiness `/ready` checks mandatory dependencies. Browser API config must use HTTPS or a same-origin proxy; SSE remains bounded incremental delivery of generated output, not native model token streaming.
 
-Inspect current code, tests, migrations, workflows, and docs before editing. Preserve working behavior and interfaces except as required by scope. Make focused changes, add regression tests, run relevant checks, and review the diff. Do not restart completed phases or claim verification without actual results.
+Auth throttling is keyed to hashed normalized email; edge/IP controls remain a deployment responsibility. Shared limiter failure must not silently permit requests. Ingestion enforces extracted-text/page/chunk limits and bounded embedding batches. Session cleanup is explicit, batched and operator-scheduled. See DEPLOYMENT.md.
 
-## Architecture and data boundaries
+## Method and verification
 
-Keep UI, API, auth/authorization, conversation services, agent orchestration, providers, tools, retrieval, and persistence separate. Use PostgreSQL + pgvector for integration tests; never substitute SQLite. Reuse existing retrieval and keep Alembic deterministic/model registration acyclic.
-
-Treat user/model input as untrusted. Only registered, typed, validated tools may execute. No generated code, arbitrary SQL, shell, filesystem, or unrestricted network execution. Never expose hidden reasoning. Bound requests, context, tool output, stream output/duration, and trace size. Enforce ownership for user-specific resources.
-
-## Security and testing
-
-Never store plaintext passwords or raw bearer tokens. Enforce expiry and revocation. Production requires explicit CORS origins and credentials for selected external providers. Keep secrets out of Git/logs; `.env.example` uses placeholders only.
-
-Tests use fake providers and PostgreSQL + pgvector. Maintain cross-user isolation and test cleanup for committed rows. For relevant changes, run Alembic, import smoke test, full backend pytest, frontend production build, and evaluation runner.
-
-## Operational limitations
-
-The rate limiter and request-ID context are process-local and not shared across replicas. Use a gateway/shared store for multi-worker/replica deployments. Streaming persists the complete exchange only after successful stream completion; client disconnects do not preserve partial assistant output.
-
-Keep README, PROJECT_BRIEF, ARCHITECTURE, DECISIONS, and PROGRESS synchronized. Distinguish verified code from deployed production.
+Inspect code, tests, migrations, workflows and docs before editing. Preserve public behavior unless within the Phase 8 mandate. Use PostgreSQL + pgvector for integration tests, never SQLite. For every change run Alembic upgrade, import smoke, full backend pytest (which runs deterministic evaluation), frontend build and GitHub Actions on the final PR HEAD. Document current implementation and any limitations accurately; do not claim external production deployment merely because CI passes.
