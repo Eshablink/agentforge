@@ -1,5 +1,6 @@
-import type { AppInfo, ChatResponse, DocumentSummary } from "./types/app";
+import type { AppInfo } from "./types/app";
 import { HomePage } from "./pages/HomePage";
+import { apiClient } from "./services/api/client";
 
 const appInfo: AppInfo = {
   name: "AgentForge",
@@ -7,7 +8,7 @@ const appInfo: AppInfo = {
 };
 
 function App() {
-  return <HomePage apiUrl={"http://localhost:8000"} appInfo={appInfo} />;
+  return <HomePage apiUrl={apiClient.baseUrl || "same origin"} appInfo={appInfo} />;
 }
 
 export default App;
