@@ -38,7 +38,7 @@ def test_stream_requires_auth() -> None:
     assert resp.status_code == 401
 
 
-def test_stream_returns_typed_sse_events_and_one_message_start() -> None:
+def test_stream_returns_typed_events_one_start_and_correlated_request_id(caplog) -> None:
     headers = _register_login(f"stream-{uuid.uuid4().hex}@example.com")
     resp = client.post("/agent/chat/stream", json={"question": "7 * 8"}, headers=headers)
     assert resp.status_code == 200
@@ -50,7 +50,16 @@ def test_stream_returns_typed_sse_events_and_one_message_start() -> None:
     assert "tool_start" in names
     assert "token" in names
     assert "message_end" in names
-    assert events[0][1]["request_id"] == resp.headers["X-Request-Id"]
+    request_id = resp.headers["X-Request-Id"]
+    assert events[0][1]["request_id"] == request_id
+    correlated = [
+        rec.agentforge_event
+        for rec in caplog.records
+        if hasattr(rec, "agentforge_event")
+        and rec.agentforge_event.get("event") in {"agent_request", "agent_stream_complete"}
+    ]
+    assert correlated
+    assert all(item.get("request_id") == request_id for item in correlated)
 
 
 def test_stream_does_not_leak_secrets_in_body() -> None:
