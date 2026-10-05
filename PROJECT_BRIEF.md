@@ -1,42 +1,9 @@
 # AgentForge Project Brief
 
-## Product summary
+AgentForge is an authenticated full-stack document-RAG and registered-tool agent. Phases 0–7 are **complete on main**. Phase 7 PR #9 was **merged** at `63d7d3f0d417d06b2e57fa63874824de4306450d`, and main CI run 37320957004 passed. Its SSE transport provides bounded incremental chunks of completed generated text, not provider-native token streaming. Its deterministic RAG/tool/agent suite is not a general model-quality benchmark.
 
-AgentForge is a full-stack application for document ingestion, grounded RAG, safe registered-tool orchestration, persistent conversations, authenticated user-owned resources, reliable AI provider calls, SSE delivery of generated answers, safe observability, and deterministic regression evaluation.
+Phase 8, on `feat/agentforge-phase-8`, provides production deployment and operational hardening: production-only explicit config, managed PostgreSQL + pgvector, one-shot Alembic migration, cheap liveness and dependency readiness, shared Redis fixed-window rate limiting with fail-closed behavior, auth attempt throttling, bounded ingestion and session cleanup, correct browser API origin, and vendor-neutral deployment guidance. This repository does not claim a live deployment.
 
-## Phase status
+The security model remains unchanged: salted PBKDF2-SHA256 passwords, hashed opaque bearer tokens, expiry and revocation, owned conversations and documents, owner-filtered retrieval, validated registered tools, no arbitrary code/shell/filesystem/SQL/network execution, and no hidden reasoning or credential logging.
 
-| Group | Count | Phase | Status |
-|---|---:|---|---|
-| Complete | 1 | Phase 0 — Repository blueprint | Implemented and verified |
-| Complete | 2 | Phase 1 — FastAPI and React foundation | Implemented and verified |
-| Complete | 3 | Phase 2 — PostgreSQL + pgvector + SQLAlchemy + Alembic | Implemented and verified |
-| Complete | 4 | Phase 3 — Document ingestion, retrieval and grounded RAG | Implemented and verified |
-| Complete | 5 | Phase 4 — Agent orchestration and safe registered tools | Implemented and verified |
-| Complete | 6 | Phase 5 — Persistent conversations and bounded memory | Implemented and verified |
-| Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented and verified |
-| Complete | 8 | Phase 7 — Production AI reliability, SSE delivery, deterministic regression suite | Implemented; verification tied to PR CI |
-| Deferred | 9 | SSO/MFA, cloud deployment, distributed rate limiting, billing/analytics | Deferred |
-
-## Implemented capabilities
-
-| Group | Count | Capability | Implementation |
-|---|---:|---|---|
-| Agent | 1 | Structured orchestration | Typed decisions; bounded execution loop and operational trace |
-| Agent | 2 | Safe tool registry | Owner-aware document search, Decimal calculator, date offset; strict schemas and bounded outputs |
-| Conversation | 3 | Persistent sessions | PostgreSQL conversations/messages; ownership checks; bounded recent context |
-| Authentication | 4 | Account/session foundation | PBKDF2-SHA256 hashes; opaque random bearer tokens stored as hashes; expiry/revocation |
-| Ownership | 5 | Private user data | Owned document routes and per-user pgvector filtering; conversation queries scoped to user |
-| Reliability | 6 | Provider controls | Config-driven fake/OpenAI selection; per-attempt timeout and bounded retries; normalized safe errors |
-| Streaming | 7 | SSE endpoint/UI | Authenticated `/agent/chat/stream`; typed events; generated answer delivered in bounded chunks; single canonical request ID |
-| Observability | 8 | Correlated operations | One request ID across header, SSE start event, and telemetry; safe bounded values only |
-| Evaluation | 9 | Deterministic regression suite | Git datasets for RAG/tools/agent with fake providers; PASS/FAIL; nonzero on failure; no paid calls |
-| UI/CI | 10 | Full-stack flow | React auth/conversation/agent UI; PostgreSQL + pgvector, backend pytest, frontend build |
-
-## Phase 7 architecture
-
-Provider interfaces remain orchestration-independent. Provider calls use per-attempt timeouts plus finite retries, and exceptions are normalized. SSE uses a typed, safe operational event vocabulary where the route owns the single request-level `message_start` and the service emits operational events; `/agent/chat` remains backward compatible. The evaluation suite is a deterministic regression suite (not a generative-model quality benchmark) and runs without paid credentials. Details and event schema are in `ARCHITECTURE.md`.
-
-## Security boundaries and limitations
-
-Only registered typed tools execute. No arbitrary Python, shell, filesystem, generated SQL, or unrestricted network tool. Model output is untrusted; chain-of-thought and secrets are never returned/logged. Ownership isolation remains enforced. Rate limiter and request-ID context are process-local; multiple workers require a gateway/shared store. Provider timeout is per attempt, so retries may extend total duration. This is a production-oriented foundation, not a deployed production service.
+To run locally use `.env.example` and `docker compose up --build` (development-only credentials and local one-shot migration). For production configure environment/secret injection and follow [DEPLOYMENT.md](DEPLOYMENT.md). The mandatory production limiter needs a provisioned Redis-compatible service; use a proxy for HTTPS, trusted forwarding, SSE buffering and edge/IP auth protection. SSO/MFA, cloud automation and native provider token streaming remain deferred.
