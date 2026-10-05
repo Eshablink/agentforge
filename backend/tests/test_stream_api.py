@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 
 from fastapi.testclient import TestClient
@@ -39,6 +40,7 @@ def test_stream_requires_auth() -> None:
 
 
 def test_stream_returns_typed_events_one_start_and_correlated_request_id(caplog) -> None:
+    caplog.set_level(logging.INFO, logger="agentforge.observability")
     headers = _register_login(f"stream-{uuid.uuid4().hex}@example.com")
     resp = client.post("/agent/chat/stream", json={"question": "7 * 8"}, headers=headers)
     assert resp.status_code == 200
