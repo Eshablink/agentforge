@@ -2,7 +2,7 @@
 
 ## Current status
 
-Phases 0–6 are implemented. Phases 0–3 are complete and merged. Phases 4–6 implementation and release-readiness hardening are CI-verified on PR #6. This is a production-oriented foundation, not a deployed service. Phase 7+ has not started.
+Phases 0–6 are implemented and CI-verified on `main`. Phase 7 (production AI reliability, streaming, and evaluation) is implemented on the `feat/agentforge-phase-7` branch and is additive to the Phase 0–6 foundation. This is a production-oriented foundation, not a deployed service.
 
 ## Roadmap
 
@@ -15,37 +15,22 @@ Phases 0–6 are implemented. Phases 0–3 are complete and merged. Phases 4–6
 | Complete | 5 | Phase 4 — Agent orchestration and safe registered tools | Implemented and verified by CI |
 | Complete | 6 | Phase 5 — Persistent conversations and bounded recent memory | Implemented and verified by CI |
 | Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented and verified by CI |
-| Deferred | 8 | SSO/MFA, rate limiting, billing, cloud deployment and Phase 7+ | Not implemented |
+| Complete | 8 | Phase 7 — Reliability, streaming, evaluation | Implemented; CI on PR branch |
+| Deferred | 9 | SSO/MFA, deployed cloud ops, billing, advanced analytics | Not implemented |
 
-## Phase 4–6 implementation
+## Phase 7 implementation
 
-- Typed agent decisions and provider abstraction; deterministic fake provider for CI.
-- Registered `document_search` (existing owner-aware pgvector retrieval), Decimal calculator, and date-offset utility; strict arguments and bounded tools/iterations/traces.
-- PostgreSQL conversations/messages with per-user ownership and bounded recent context, ordered deterministically.
-- PBKDF2-SHA256 password hashes, random bearer tokens persisted only as hashes, expiry and revocation.
-- Authenticated document upload/list, conversation CRUD/message and agent routes; vector search filters by authenticated user.
-- Preserved Phase 3 endpoints for unowned legacy records only.
-- Audit hardening: explicit production CORS/provider/resource checks, safe provider error fallback, structured bounded RAG output with source provenance, deterministic message ordering and frontend conversation refresh.
+- Provider reliability: bounded timeouts (`llm_timeout_seconds`) and finite retries (`llm_max_retries`); normalized provider error taxonomy (`app/services/provider_errors.py`, `provider_utils.py`) mapped to safe category codes; fake provider remains the CI default; provider selection stays configuration-driven; secrets never logged.
+- Streaming: authenticated SSE endpoint `POST /agent/chat/stream` with a typed event contract (`message_start`, `tool_start`, `tool_result`, `retrieval`, `token`, `message_end`, `error`) in `app/schemas/stream.py`; ownership checks and bounded output preserved; no chain-of-thought or secrets; `/agent/chat` remains backward compatible.
+- Frontend streaming: typed SSE contract in `frontend/src/types/app.ts`, an authenticated fetch-based SSE parser in `client.ts`, and incremental rendering with tool activity, a Cancel control, and graceful error handling in `HomePage.tsx`.
+- Observability: request-ID propagation (`app/core/telemetry.py`, middleware in `app/main.py`) with bounded/sanitized operational metadata only.
+- Rate/resource protection: process-local sliding-window limiter (`app/core/rate_limit.py`) and additional bounds (prompt/stream/output) in settings; deployment limitation documented below.
+- Evaluation: version-controlled datasets under `evaluation/datasets/` and a deterministic runner `evaluation/runner/run_evals.py` (RAG, tool, agent regression) with clear PASS/FAIL and non-zero exit on failure; no paid API calls.
 
 ## Verification record
 
-| Group | Count | Verification | Result |
-|---|---:|---|---|
-| CI | 1 | Run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744), application audit commit `445eb36f512e33160df5916e45e1a8f80306903a` | Backend + frontend PASS |
-| CI | 2 | Run [37130211450](https://github.com/Eshablink/agentforge/actions/runs/37130211450), audit implementation and progress update | Backend + frontend PASS |
-| CI | 3 | Run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888), consolidated app/docs update | Backend + frontend PASS |
+The Phase 7 PR-head CI is verified by GitHub Actions (PostgreSQL + pgvector, Alembic upgrade, import smoke test, full pytest, frontend TypeScript/Vite build, and the Phase 7 evaluation suite). Fake providers require no paid credentials.
 
-The green workflows provision PostgreSQL + pgvector, run Alembic `upgrade head`, import smoke test, full backend pytest (including PostgreSQL ownership/retrieval tests) and frontend production TypeScript/Vite build. Fake providers require no paid credentials. Current PR-head verification is available in the PR checks; historical runs apply only to their associated commits.
+## Known limitations
 
-## Release-readiness audit findings
-
-- Authenticated `user_id` flows through agent → tool registry → RAG → retrieval; database query filters by owner. Legacy queries filter to unowned rows only.
-- Protected conversation operations scope reads/deletes by owner; document listing/upload use owner-specific routes.
-- Passwords use salted PBKDF2-SHA256; bearer credentials are random and only token hashes persist; expiry/revocation are checked.
-- Registered typed tools reject unknown names/invalid arguments; no arbitrary code, shell, filesystem, generated SQL or unrestricted network tools. Provider errors are controlled; traces omit secrets and chain-of-thought.
-- Memory is limited to recent messages of the selected owned conversation, bounded by count and characters, with deterministic order.
-- Production rejects wildcard/empty CORS origins, validates selected-provider credentials, and bounds resource limits.
-
-## Deferred scope
-
-Browser bearer token is memory-only and requires reauthentication after reload. There is no deployed cloud/Kubernetes service, SSO/MFA, formal rate limiting, billing, advanced analytics, or Phase 7+ work. Configure HTTPS/reverse proxy, monitoring and production secret operations before external deployment.
+The in-process rate limiter and request-ID context are single-process only; a gateway or shared store is required for multi-worker/replica deployments. Streaming persists the full exchange after the stream completes; disconnect/cancellation before completion does not persist a partial assistant message. See `ARCHITECTURE.md` for the full security/architecture detail.
