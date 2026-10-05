@@ -62,16 +62,16 @@ This file records decisions implemented in the Phase 0–6 foundation and the Ph
 
 ## ADR-013 — PostgreSQL-backed CI and health-gated startup
 - **Decision:** PostgreSQL + pgvector service, Alembic migration, import smoke test, full pytest and frontend build in GitHub Actions.
-- **Status:** Accepted; green on prior phases.
+- **Status:** Accepted; implemented for prior phases and retained for Phase 7.
 
 ## ADR-014 — Normalized provider errors and bounded retries
-- **Decision:** Map provider failures to a small safe taxonomy and bound timeouts/retries via settings (`llm_timeout_seconds`, `llm_max_retries`).
-- **Reason:** Predictable degradation without leaking secrets; no unbounded waiting.
+- **Decision:** Map provider failures to a safe taxonomy and bound provider calls through per-attempt client timeouts plus finite retries (`llm_timeout_seconds`, `llm_max_retries`). The timeout setting is per attempt, not an overall deadline; a retrying operation may last for multiple attempts plus bounded backoff.
+- **Reason:** Predictable degradation without leaking secrets; no unbounded retrying or waiting beyond configured provider attempt timeouts.
 - **Status:** Accepted; implemented in Phase 7.
 
-## ADR-015 — SSE streaming with a typed, secret-free event contract
-- **Decision:** Add `POST /agent/chat/stream` using Server-Sent Events and a fixed event vocabulary (`message_start`, `tool_start`, `tool_result`, `retrieval`, `token`, `message_end`, `error`); keep `/agent/chat` non-streaming for backward compatibility.
-- **Reason:** Incremental UX with a stable, auditable wire contract that cannot leak chain-of-thought or secrets.
+## ADR-015 — SSE transport with a typed, secret-free event contract
+- **Decision:** Add `POST /agent/chat/stream` using Server-Sent Events and a fixed event vocabulary; the route emits exactly one request-level `message_start`, and the service emits operational events only. The provider currently returns structured decisions/final answer text; SSE delivers bounded chunks of generated output, not provider-native token deltas. Keep `/agent/chat` backward compatible.
+- **Reason:** Incremental client delivery with a stable, auditable wire contract without introducing a fragile new provider abstraction.
 - **Status:** Accepted; implemented in Phase 7.
 
 ## ADR-016 — Process-local rate limiting with documented limits
@@ -79,11 +79,11 @@ This file records decisions implemented in the Phase 0–6 foundation and the Ph
 - **Reason:** Lightweight protection of expensive endpoints without fragile shared state; deployment limitation is documented.
 - **Status:** Accepted; implemented in Phase 7 (multi-worker deployments require a gateway/shared store).
 
-## ADR-017 — Deterministic version-controlled evaluation suite
-- **Decision:** Keep RAG/tool/agent regression datasets in Git and run them via a deterministic runner with fake providers; exit non-zero on failure; integrate into CI.
-- **Reason:** Reproducible, credential-free regression coverage.
+## ADR-017 — Deterministic version-controlled regression suite
+- **Decision:** Keep RAG/tool/agent cases in Git and run them with fake providers; print PASS/FAIL and exit non-zero on failure.
+- **Reason:** Reproducible, credential-free checks for source/retrieval behavior, tool safety/selection, bounded agent behavior, and safe provider failures. This suite is not a general LLM quality benchmark.
 - **Status:** Accepted; implemented in Phase 7.
 
 ## Deferred scope
 
-SSO/MFA, deployed cloud/Kubernetes operations, billing, advanced analytics, and distributed (multi-process) rate limiting remain deferred. This is not a deployed production service.
+SSO/MFA, deployed cloud/Kubernetes operations, billing, advanced analytics, and distributed rate limiting remain deferred. This is not a deployed production service.
