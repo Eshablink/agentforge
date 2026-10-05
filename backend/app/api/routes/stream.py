@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import time
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -24,9 +25,7 @@ from app.services.stream_agent_service import StreamAgentService
 from app.services.tool_registry import ToolRegistry
 
 router = APIRouter(tags=["agent", "streaming"])
-
-# Process-local AI rate limiter (not cluster-safe; see PROGRESS.md limitations).
-_ai_limiter = SlidingWindowLimiter(20, 60)
+_ai_limiter = SlidingWindowLimiter(get_settings().ai_requests_per_minute, 60)
 
 
 def _stream_service(db: Session) -> StreamAgentService:
@@ -61,17 +60,9 @@ def _memory_context(db: Session, conversation: Conversation) -> str:
 def _persist_exchange(db: Session, conversation: Conversation, question: str, answer: str, answer_kind: str, tools_used: list[str], sources: list[dict]) -> None:
     db.add_all([
         Message(conversation_id=conversation.id, role="user", content=question),
-        Message(
-            conversation_id=conversation.id,
-            role="assistant",
-            content=answer,
-            metadata_json={
-                "answer_kind": answer_kind,
-                "tools_used": tools_used,
-                "sources": sources,
-                "events": [{"event": "streamed"}],
-            },
-        ),
+        Message(conversation_id=conversation.id, role="assistant", content=answer,
+                metadata_json={"answer_kind": answer_kind, "tools_used": tools_used, "sources": sources,
+                               "events": [{"event": "streamed"}]}),
     ])
     conversation.updated_at = datetime.now(timezone.utc)
     db.commit()
@@ -84,25 +75,24 @@ async def agent_chat_stream(
     db: Session = Depends(get_db),
     user: User = Depends(current_user),
 ):
+    settings = get_settings()
+    if len(payload.question) > settings.max_prompt_chars:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Prompt exceeds maximum allowed size")
+    content_length = request.headers.get("content-length")
+    if content_length and int(content_length) > settings.max_request_body_bytes:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Request body exceeds maximum allowed size")
     request_id = new_request_id()
     token = set_request_id(request_id)
-
-    # Enforce per-user rate limit before any expensive work.
     try:
         _ai_limiter.check(str(user.id))
     except RateLimitExceeded as exc:
         reset_request_id(token)
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc))
-
-    record("agent_stream_request", endpoint="/agent/chat/stream", user_id=str(user.id))
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
     conversation = _owned_conversation(db, user, payload.conversation_id) if payload.conversation_id is not None else None
     context = _memory_context(db, conversation) if conversation is not None else ""
     service = _stream_service(db)
-
-    # Capture the synchronous agent run so the SSE generator can persist once.
-    collected: dict = {}
-    service_ref = service
+    started = time.perf_counter()
 
     async def event_generator():
         try:
@@ -111,8 +101,7 @@ async def agent_chat_stream(
             tools_used: list[str] = []
             sources: list[dict] = []
             yield _sse("message_start", {"request_id": request_id, "conversation_id": str(conversation.id) if conversation else None})
-
-            for event_name, data in service_ref.stream(payload.question, context=context, user_id=user.id):
+            for event_name, data in service.stream(payload.question, context=context, user_id=user.id):
                 if event_name == "token":
                     answer_parts.append(data.get("text", ""))
                 elif event_name == "message_end":
@@ -120,30 +109,22 @@ async def agent_chat_stream(
                     tools_used = data.get("tools_used", tools_used)
                     sources = data.get("sources", sources)
                 yield _sse(event_name, data)
-
             if conversation is not None:
-                full_answer = "".join(answer_parts)
                 try:
-                    _persist_exchange(db, conversation, payload.question, full_answer, answer_kind, tools_used, sources)
-                    collected["persisted"] = True
+                    _persist_exchange(db, conversation, payload.question, "".join(answer_parts), answer_kind, tools_used, sources)
                 except Exception:
+                    db.rollback()
                     record("agent_stream_persist_error", user_id=str(user.id))
-
-            record("agent_stream_complete", user_id=str(user.id))
+            record("agent_stream_complete", latency_ms=round((time.perf_counter() - started) * 1000, 3), success=True)
         except asyncio.CancelledError:
-            record("agent_stream_cancelled", user_id=str(user.id))
+            record("agent_stream_cancelled", latency_ms=round((time.perf_counter() - started) * 1000, 3))
             raise
         finally:
             reset_request_id(token)
 
     return StreamingResponse(
-        event_generator(),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-            "X-Request-Id": request_id,
-        },
+        event_generator(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Request-Id": request_id},
     )
 
 
