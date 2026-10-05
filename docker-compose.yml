@@ -15,40 +15,39 @@ services:
       timeout: 5s
       retries: 20
 
+  migrate:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment: &backend_env
+      APP_ENV: development
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://agentforge:agentforge@db:5432/agentforge}
+      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-fake}
+      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      RATE_LIMIT_BACKEND: memory
+    command: ["alembic", "-c", "alembic.ini", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    environment:
-      APP_NAME: ${APP_NAME:-AgentForge API}
-      APP_ENV: ${APP_ENV:-development}
-      APP_VERSION: ${APP_VERSION:-0.1.0}
-      API_PREFIX: ${API_PREFIX:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
-      DATABASE_URL: ${DATABASE_URL:-postgresql+psycopg://agentforge:agentforge@db:5432/agentforge}
-      EMBEDDING_PROVIDER: ${EMBEDDING_PROVIDER:-fake}
-      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
-      EMBEDDING_DIMENSION: ${EMBEDDING_DIMENSION:-1536}
-      LLM_PROVIDER: ${LLM_PROVIDER:-fake}
-      LLM_MODEL: ${LLM_MODEL:-gpt-4o-mini}
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      AUTH_SECRET: ${AUTH_SECRET:-}
-      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-3600}
-      MAX_AGENT_STEPS: ${MAX_AGENT_STEPS:-5}
-      MAX_TOOL_CALLS: ${MAX_TOOL_CALLS:-4}
-      MAX_CONVERSATION_MESSAGES: ${MAX_CONVERSATION_MESSAGES:-20}
-      MAX_CONVERSATION_CONTEXT_CHARS: ${MAX_CONVERSATION_CONTEXT_CHARS:-8000}
-      CHUNK_SIZE: ${CHUNK_SIZE:-800}
-      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-120}
-      RAG_TOP_K_DEFAULT: ${RAG_TOP_K_DEFAULT:-5}
-      RAG_TOP_K_MAX: ${RAG_TOP_K_MAX:-10}
-      MAX_UPLOAD_SIZE_BYTES: ${MAX_UPLOAD_SIZE_BYTES:-10485760}
-      SUPPORTED_CONTENT_TYPES: ${SUPPORTED_CONTENT_TYPES:-application/pdf,text/plain,text/markdown}
+    environment: *backend_env
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
-      db:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
 
   frontend:
     build:
@@ -59,7 +58,8 @@ services:
     ports:
       - "${FRONTEND_PORT:-5173}:5173"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres_data:
