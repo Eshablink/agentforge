@@ -1,4 +1,4 @@
-import type { AgentChatResponse, ChatResponse, ConversationSummary, DocumentSummary, SessionResponse, UserIdentity } from "../../types/app";
+import type { AgentChatResponse, ChatResponse, ConversationSummary, DocumentSummary, SessionResponse, StreamEventData, StreamEventName, StreamHandler, UserIdentity } from "../../types/app";
 
 const FALLBACK_API_BASE_URL = "http://localhost:8000";
 const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
@@ -19,6 +19,58 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   }
   if (response.status === 204) return undefined as T;
   return await response.json() as T;
+}
+
+async function streamAgentChat(
+  question: string,
+  conversationId: string | undefined,
+  onEvent: StreamHandler,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (!accessToken) throw new Error("Authentication required");
+  const response = await fetch(`${baseUrl}/agent/chat/stream`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify({ question, conversation_id: conversationId ?? null }),
+    signal,
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null) as { detail?: string } | null;
+    if (response.status === 401) setAccessToken(null);
+    throw new Error(payload?.detail || `Stream failed with status ${response.status}`);
+  }
+  if (!response.body) throw new Error("Streaming response body is unavailable");
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let boundary: number;
+      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
+        let eventName = "message";
+        let dataText = "";
+        for (const line of frame.split("\n")) {
+          if (line.startsWith("event:")) eventName = line.slice(6).trim();
+          else if (line.startsWith("data:")) dataText += line.slice(5).trim();
+        }
+        if (!dataText) continue;
+        try {
+          const parsed = JSON.parse(dataText) as StreamEventData;
+          onEvent(eventName as StreamEventName, parsed);
+        } catch {
+          onEvent("error", { message: "Invalid streaming event received", code: "invalid_event" });
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
 }
 
 export const apiClient = {
@@ -44,6 +96,7 @@ export const apiClient = {
   agentChat(question: string, conversationId?: string): Promise<AgentChatResponse> {
     return request<AgentChatResponse>("/agent/chat", { method: "POST", body: JSON.stringify({ question, conversation_id: conversationId ?? null }) });
   },
+  streamAgentChat,
   listConversations(): Promise<ConversationSummary[]> { return request<ConversationSummary[]>("/conversations"); },
   createConversation(title: string): Promise<ConversationSummary> {
     return request<ConversationSummary>("/conversations", { method: "POST", body: JSON.stringify({ title }) });

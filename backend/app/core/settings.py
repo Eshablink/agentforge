@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     database_url: str = "postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge"
     max_upload_size_bytes: int = 10 * 1024 * 1024
+    max_request_body_bytes: int = 64 * 1024
     supported_content_types: str = "application/pdf,text/plain,text/markdown"
     chunk_size: int = 800
     chunk_overlap: int = 120
@@ -26,6 +27,8 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     llm_provider: str = "fake"
     llm_model: str = LLM_MODEL_DEFAULT
+    llm_timeout_seconds: float = 20.0
+    llm_max_retries: int = 2
     session_ttl_seconds: int = 3600
     password_min_length: int = 12
     max_agent_steps: int = 5
@@ -34,6 +37,10 @@ class Settings(BaseSettings):
     max_conversation_context_chars: int = 8000
     rag_top_k_default: int = 5
     rag_top_k_max: int = 10
+    ai_requests_per_minute: int = 20
+    max_prompt_chars: int = 5000
+    max_stream_duration_seconds: int = 60
+    max_stream_output_chars: int = 12000
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
 
@@ -72,8 +79,13 @@ class Settings(BaseSettings):
             raise ValueError("session lifetime and password minimum are below secure defaults")
         if not 1 <= self.max_agent_steps <= 5 or not 1 <= self.max_tool_calls <= 4:
             raise ValueError("agent execution limits exceed safe configured bounds")
-        if self.max_upload_size_bytes < 1 or self.max_conversation_messages < 1 or self.max_conversation_context_chars < 1:
+        positive_limits = [self.max_upload_size_bytes, self.max_request_body_bytes, self.max_conversation_messages,
+                           self.max_conversation_context_chars, self.ai_requests_per_minute, self.max_prompt_chars,
+                           self.max_stream_duration_seconds, self.max_stream_output_chars]
+        if any(value < 1 for value in positive_limits):
             raise ValueError("configured resource limits must be positive")
+        if self.llm_timeout_seconds <= 0 or not 0 <= self.llm_max_retries <= 3:
+            raise ValueError("provider timeout/retry settings exceed safe bounds")
         return self
 
     @property

@@ -1,15 +1,15 @@
 # AgentForge Architecture
 
-## Current verified architecture — Phases 0–6
+## Current verified architecture — Phases 0–7
 
-Phases 0–3 provide the document-RAG foundation. Phases 4–6 add registered safe tools, persistent user-owned conversations, and authentication/authorization. The implementation is CI-verified on PR #6; this is a production-oriented foundation, not a deployed service.
+Phases 0–3 provide the document-RAG foundation. Phases 4–6 add registered safe tools, persistent user-owned conversations, and authentication/authorization. Phase 7 adds provider reliability, authenticated SSE streaming, lightweight observability, and a deterministic evaluation suite — all additive.
 
 ```text
 React + TypeScript + Vite
-        ↓ HTTP + bearer token
+        ↓ HTTP + bearer token (SSE for streaming)
 FastAPI routes and typed schemas
         ↓
-Authentication / owner authorization
+Request-ID middleware / authentication / owner authorization
         ↓
 Conversation service (bounded recent context)
         ↓
@@ -23,43 +23,54 @@ Allowlisted tool registry
 PostgreSQL + pgvector (Alembic-managed schema)
 ```
 
-## Preserved Phase 3 data paths
+## Phase 7 additions
 
-PDF/TXT/Markdown upload → validation/extraction → deterministic chunks → embedding abstraction → transactional PostgreSQL persistence. Query → embedding → the existing pgvector cosine retrieval service → context → grounded LLM answer and source references.
+### Provider reliability
 
-For authenticated requests, `user_id` flows through agent → document-search tool → retrieval query, which filters on owner. Legacy `/documents` and `/chat` paths are retained for compatibility with unowned legacy rows only. The agent does not duplicate vector search.
+`app/services/provider_errors.py` defines a normalized error taxonomy (`provider_timeout`, `provider_rate_limited`, `provider_auth`, `provider_unavailable`, `provider_invalid_response`, `provider_config`). `app/services/provider_utils.py` provides finite retry with classification.
 
-## Agent controls
+The `llm_timeout_seconds` setting is a **per-attempt timeout**, not a total operation budget: it is applied to the OpenAI HTTP client (`timeout=`), and the provider is allowed `llm_max_retries` additional attempts with bounded exponential backoff. The maximum operation duration is therefore approximately `(max_retries + 1) × timeout_seconds + bounded_backoff`. The retry helper does not run arbitrary callables in threads/processes to interrupt them.
 
-| Group | Count | Control |
-|---|---:|---|
-| Agent | 1 | Structured validated provider decision; model output is untrusted |
-| Tools | 2 | Allowlist: document search, calculator, date offset |
-| Validation | 3 | Typed per-tool arguments; unknown tools and extra/invalid arguments rejected |
-| Limits | 4 | Bounded iterations, calls, `top_k`, chunks, text, tool results and trace events |
-| Execution | 5 | No arbitrary Python, shell, filesystem, generated SQL or unrestricted network |
-| Trace | 6 | Operational events only; no chain-of-thought or secrets |
+### Streaming (SSE)
 
-The RAG tool calls the existing `RetrievalService`. Provider abstractions permit external integrations; deterministic fakes are used in CI.
+`POST /agent/chat/stream` (in `app/api/routes/stream.py`) emits a typed event stream via `app/schemas/stream.py`:
 
-## Authentication, ownership and conversation memory
+| Event | Payload | Layer | Notes |
+|---|---|---|---|
+| `message_start` | request_id, conversation_id | route | exactly one per stream; `request_id` equals the response `X-Request-Id` |
+| `tool_start` | tool | service | allowlisted tool name |
+| `tool_result` | tool, status | service | safe status only |
+| `retrieval` | count | service | bounded count |
+| `token` | text | service | bounded incremental text chunk |
+| `message_end` | answer_kind, tools_used, sources | service | final state |
+| `error` | message, code | service | safe, bounded error |
 
-Passwords use salted PBKDF2-SHA256 hashes. Random bearer credentials are returned to the browser while only their hashes are stored; server-side expiry and revocation are checked per request. Protected document, chat, agent and conversation APIs derive user identity from the auth dependency and scope records by `user_id`; foreign conversation IDs return not found.
+The stream is **transport-level SSE delivery of generated output**: the agent produces bounded answer text, and the service emits it incrementally in bounded chunks. It is **not** provider-native token streaming; the provider returns structured decisions whose final text is then chunked and delivered. No chain-of-thought, no secrets, no prompt text. The non-streaming `/agent/chat` endpoint remains unchanged.
 
-Messages are stored in PostgreSQL. Memory includes only a bounded recent window from the requested owned conversation, ordered by timestamp and ID and limited by message count/character count. User/assistant turns persist in one transaction. The browser stores tokens in memory, so a reload requires sign-in.
+### Request ID correlation
 
-## Database and migrations
+A single canonical request ID is created once per HTTP request in the `main.py` middleware. It is exposed through the response `X-Request-Id` header, through `request.state.request_id` (which the streaming route reuses inside its body generator), and through `telemetry.get_request_id()` for log correlation. `message_start.request_id`, the header, and all telemetry therefore refer to the same ID.
 
-| Group | Count | Table/component | Role |
-|---|---:|---|---|
-| Data | 1 | `users`, `auth_sessions` | User account, password hash, hashed bearer token, expiry/revocation |
-| Data | 2 | `documents`, `document_chunks` | Nullable owner for legacy rows; text, metadata and pgvector embeddings |
-| Data | 3 | `conversations`, `messages` | Per-user history and bounded operational metadata |
-| Data | 4 | SQLAlchemy 2.x + PostgreSQL/pgvector | ORM and vector queries |
-| Schema | 5 | Alembic | Deterministic incremental migrations; existing pgvector schema preserved |
+### Observability
 
-Alembic imports registered models using the standalone `app.db.base`; integration checks use PostgreSQL + pgvector, not SQLite. Docker waits for DB health and applies migrations before API startup.
+`app/core/telemetry.py` provides request-ID context and a sanitized `record()` helper. Only bounded, non-sensitive operational metadata is logged, including endpoint, method, request/provider/tool/retrieval latency, and status.
 
-## Verification and deferred scope
+### Rate/resource protection
 
-The latest code and docs CI result should be taken from the current PR #6 head. CI provisions PostgreSQL + pgvector, applies Alembic, checks import, runs full pytest and builds the frontend. This project is not externally deployed. SSO/MFA, formal rate limiting, HTTPS/reverse proxy operations, monitoring, cloud/Kubernetes, billing, analytics and Phase 7+ remain deferred.
+`app/core/rate_limit.py` provides a process-local sliding-window limiter (per-user) shared by the chat and streaming endpoints; settings add `ai_requests_per_minute`, `max_prompt_chars`, `max_request_body_bytes`, `max_stream_duration_seconds`, and `max_stream_output_chars`. This is single-process only; a gateway/shared store is required for multiple workers.
+
+### Evaluation
+
+`evaluation/datasets/*.json` hold version-controlled RAG/tool/agent regression cases; `evaluation/runner/run_evals.py` runs them deterministically with fake providers and prints PASS/FAIL, exiting non-zero on failure. This is a **deterministic regression suite**, not a generative model-quality benchmark. It checks retrieval/source presence, grounding-related answer behavior, tool selection and argument validation, invalid-tool rejection, bounded agent execution, and provider-failure safety — without paid API calls.
+
+## Preserved Phase 3–6 data paths
+
+Document ingestion, owner-filtered retrieval, conversations, auth, and security boundaries remain as documented in PR #6; Phase 7 does not alter them.
+
+## Security boundaries
+
+No arbitrary Python, shell, filesystem, generated SQL, or unrestricted network tools. Model output is untrusted; only typed, allowlisted tools execute. Operational traces and SSE frames exclude chain-of-thought and secrets. User-owned documents and conversations stay isolated by authenticated user ID.
+
+## Known limitations
+
+Single-process rate limiting and request-ID context; streaming is transport-level SSE chunking of generated output (not provider token streaming); streaming persists the full exchange only after the stream completes. HTTPS/reverse proxy, SSO/MFA, cloud/Kubernetes, billing, and advanced analytics remain deferred.

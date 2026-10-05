@@ -31,3 +31,16 @@ def test_agent_limits_are_bounded() -> None:
         Settings(max_agent_steps=99)
     with pytest.raises(ValidationError):
         Settings(max_tool_calls=99)
+
+
+def test_phase7_provider_and_resource_bounds() -> None:
+    configured = Settings(llm_timeout_seconds=12, llm_max_retries=3, ai_requests_per_minute=7)
+    assert configured.llm_timeout_seconds == 12
+    assert configured.llm_max_retries == 3
+    assert configured.ai_requests_per_minute == 7
+    with pytest.raises(ValidationError):
+        Settings(llm_max_retries=4)
+    with pytest.raises(ValidationError):
+        Settings(llm_timeout_seconds=0)
+    with pytest.raises(ValidationError):
+        Settings(max_request_body_bytes=0)

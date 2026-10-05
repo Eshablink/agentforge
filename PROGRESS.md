@@ -2,7 +2,7 @@
 
 ## Current status
 
-Phases 0–6 are implemented. Phases 0–3 are complete and merged. Phases 4–6 implementation and release-readiness hardening are CI-verified on PR #6. This is a production-oriented foundation, not a deployed service. Phase 7+ has not started.
+Phases 0–6 are implemented and CI-verified on `main`. Phase 7 (production AI reliability, SSE delivery, and deterministic regression evaluation) is implemented on `feat/agentforge-phase-7` and is additive to the Phase 0–6 foundation. This is a production-oriented foundation, not a deployed service.
 
 ## Roadmap
 
@@ -15,37 +15,22 @@ Phases 0–6 are implemented. Phases 0–3 are complete and merged. Phases 4–6
 | Complete | 5 | Phase 4 — Agent orchestration and safe registered tools | Implemented and verified by CI |
 | Complete | 6 | Phase 5 — Persistent conversations and bounded recent memory | Implemented and verified by CI |
 | Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented and verified by CI |
-| Deferred | 8 | SSO/MFA, rate limiting, billing, cloud deployment and Phase 7+ | Not implemented |
+| Complete | 8 | Phase 7 — Reliability, SSE delivery, deterministic regression suite | Implemented; current PR-head CI verification required |
+| Deferred | 9 | SSO/MFA, deployed cloud ops, billing, advanced analytics | Not implemented |
 
-## Phase 4–6 implementation
+## Phase 7 implementation
 
-- Typed agent decisions and provider abstraction; deterministic fake provider for CI.
-- Registered `document_search` (existing owner-aware pgvector retrieval), Decimal calculator, and date-offset utility; strict arguments and bounded tools/iterations/traces.
-- PostgreSQL conversations/messages with per-user ownership and bounded recent context, ordered deterministically.
-- PBKDF2-SHA256 password hashes, random bearer tokens persisted only as hashes, expiry and revocation.
-- Authenticated document upload/list, conversation CRUD/message and agent routes; vector search filters by authenticated user.
-- Preserved Phase 3 endpoints for unowned legacy records only.
-- Audit hardening: explicit production CORS/provider/resource checks, safe provider error fallback, structured bounded RAG output with source provenance, deterministic message ordering and frontend conversation refresh.
+- Provider reliability: explicit per-attempt client timeouts (`llm_timeout_seconds`) and finite retries (`llm_max_retries`) with bounded backoff; normalized provider error taxonomy; fake provider remains the CI default; provider selection remains configuration-driven; secrets are not logged. The timeout is **per attempt**, not a total-operation deadline.
+- Streaming: authenticated SSE endpoint `POST /agent/chat/stream` with typed event contract (`message_start`, `tool_start`, `tool_result`, `retrieval`, `token`, `message_end`, `error`). The route emits exactly one `message_start` using the canonical middleware request ID. The agent returns generated answer text which is delivered incrementally in bounded SSE chunks; this is not provider-native token streaming. `/agent/chat` remains backward compatible.
+- Frontend SSE: typed event contract, authenticated fetch-based parser, incremental chunk rendering, tool activity, cancel action, source visibility, and graceful error handling.
+- Observability: one request ID per HTTP request, correlated across `X-Request-Id`, SSE `message_start`, and telemetry; bounded operational metadata only.
+- Rate/resource protection: process-local sliding-window limiter shared by agent endpoints plus prompt, request-body, output, duration, tool, and trace bounds.
+- Evaluation: version-controlled RAG/tool/agent datasets with deterministic fake-provider regression cases. Covers source/retrieval behavior, answer grounding against retrieved text, tool selection/allowlisting, invalid-tool rejection, bounded execution, and safe provider failures. It is a regression suite, not a broad generative-quality benchmark.
 
 ## Verification record
 
-| Group | Count | Verification | Result |
-|---|---:|---|---|
-| CI | 1 | Run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744), application audit commit `445eb36f512e33160df5916e45e1a8f80306903a` | Backend + frontend PASS |
-| CI | 2 | Run [37130211450](https://github.com/Eshablink/agentforge/actions/runs/37130211450), audit implementation and progress update | Backend + frontend PASS |
-| CI | 3 | Run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888), consolidated app/docs update | Backend + frontend PASS |
+The latest PR-head GitHub Actions run is authoritative for this branch. CI uses PostgreSQL + pgvector, applies Alembic, performs import smoke, runs full backend pytest (including the evaluation-runner test), and builds the frontend. See the PR checks for current verification.
 
-The green workflows provision PostgreSQL + pgvector, run Alembic `upgrade head`, import smoke test, full backend pytest (including PostgreSQL ownership/retrieval tests) and frontend production TypeScript/Vite build. Fake providers require no paid credentials. Current PR-head verification is available in the PR checks; historical runs apply only to their associated commits.
+## Known limitations
 
-## Release-readiness audit findings
-
-- Authenticated `user_id` flows through agent → tool registry → RAG → retrieval; database query filters by owner. Legacy queries filter to unowned rows only.
-- Protected conversation operations scope reads/deletes by owner; document listing/upload use owner-specific routes.
-- Passwords use salted PBKDF2-SHA256; bearer credentials are random and only token hashes persist; expiry/revocation are checked.
-- Registered typed tools reject unknown names/invalid arguments; no arbitrary code, shell, filesystem, generated SQL or unrestricted network tools. Provider errors are controlled; traces omit secrets and chain-of-thought.
-- Memory is limited to recent messages of the selected owned conversation, bounded by count and characters, with deterministic order.
-- Production rejects wildcard/empty CORS origins, validates selected-provider credentials, and bounds resource limits.
-
-## Deferred scope
-
-Browser bearer token is memory-only and requires reauthentication after reload. There is no deployed cloud/Kubernetes service, SSO/MFA, formal rate limiting, billing, advanced analytics, or Phase 7+ work. Configure HTTPS/reverse proxy, monitoring and production secret operations before external deployment.
+The in-process limiter and request-ID context are single-process only; multi-worker/replica deployments need a gateway or shared store. Provider timeout is per attempt, so an operation with retries may take longer than one timeout period. SSE chunks deliver completed generated output rather than native provider token deltas. A disconnected stream does not persist a partial assistant message.
