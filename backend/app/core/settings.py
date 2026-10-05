@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     database_url: str = "postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge"
     max_upload_size_bytes: int = 10 * 1024 * 1024
+    max_request_body_bytes: int = 64 * 1024
     supported_content_types: str = "application/pdf,text/plain,text/markdown"
     chunk_size: int = 800
     chunk_overlap: int = 120
@@ -78,9 +79,9 @@ class Settings(BaseSettings):
             raise ValueError("session lifetime and password minimum are below secure defaults")
         if not 1 <= self.max_agent_steps <= 5 or not 1 <= self.max_tool_calls <= 4:
             raise ValueError("agent execution limits exceed safe configured bounds")
-        positive_limits = [self.max_upload_size_bytes, self.max_conversation_messages, self.max_conversation_context_chars,
-                           self.ai_requests_per_minute, self.max_prompt_chars, self.max_stream_duration_seconds,
-                           self.max_stream_output_chars]
+        positive_limits = [self.max_upload_size_bytes, self.max_request_body_bytes, self.max_conversation_messages,
+                           self.max_conversation_context_chars, self.ai_requests_per_minute, self.max_prompt_chars,
+                           self.max_stream_duration_seconds, self.max_stream_output_chars]
         if any(value < 1 for value in positive_limits):
             raise ValueError("configured resource limits must be positive")
         if self.llm_timeout_seconds <= 0 or not 0 <= self.llm_max_retries <= 3:
