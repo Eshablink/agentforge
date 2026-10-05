@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.rate_limit import RateLimitExceeded, ai_request_limiter
 from app.core.settings import get_settings
-from app.core.telemetry import record
+from app.core.telemetry import record, reset_request_id, set_request_id
 from app.db.dependencies import get_db
 from app.models.conversation import Conversation, Message
 from app.models.user import User
@@ -75,10 +75,9 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Content-Length") from exc
 
-    # Reuse the single canonical request ID created by the middleware so
-    # message_start.request_id, the X-Request-Id header, and telemetry agree.
     request_id = getattr(request.state, "request_id", None)
-
+    if not request_id:
+        raise RuntimeError("Canonical request ID middleware is not installed")
     try:
         ai_request_limiter.check(str(user.id))
     except RateLimitExceeded as exc:
@@ -90,15 +89,16 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
     started = time.perf_counter()
 
     async def event_generator():
+        # Set and reset the context in the generator's own execution context.
+        # Agent/provider/tool telemetry emitted during iteration now shares the
+        # same canonical request ID as the HTTP response and SSE start event.
+        context_token = set_request_id(request_id)
         completed = False
         try:
             answer_parts: list[str] = []
             answer_kind = "INSUFFICIENT_EVIDENCE"
             tools_used: list[str] = []
             sources: list[dict] = []
-            # The route owns the request-level message_start event (it knows the
-            # canonical request ID and conversation ID). The service emits only
-            # operational events (tool/retrieval/token/message_end/error).
             yield _sse("message_start", {"request_id": request_id, "conversation_id": str(conversation.id) if conversation else None})
             for event_name, data in service.stream(payload.question, context=context, user_id=user.id):
                 if event_name == "token":
@@ -117,6 +117,8 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
             record("agent_stream_complete", request_id=request_id, latency_ms=round((time.perf_counter() - started) * 1000, 3), success=completed)
         except asyncio.CancelledError:
             record("agent_stream_cancelled", request_id=request_id, latency_ms=round((time.perf_counter() - started) * 1000, 3)); raise
+        finally:
+            reset_request_id(context_token)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Request-Id": request_id})
 
