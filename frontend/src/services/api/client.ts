@@ -1,7 +1,7 @@
 import type { AgentChatResponse, ChatResponse, ConversationSummary, DocumentSummary, SessionResponse, StreamEventData, StreamEventName, StreamHandler, UserIdentity } from "../../types/app";
 
-// Explicit Vite URL for cross-origin deployments; otherwise proxy API paths
-// through the same origin. Never ship a localhost URL in a production bundle.
+// Cross-origin production uses an explicit HTTPS URL. Same-origin production
+// proxies API paths. The localhost fallback applies to development ONLY.
 const configuredBaseUrl = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
 if (configuredBaseUrl && !/^https?:\/\/[^/]+(?:\/[^?#]*)?$/.test(configuredBaseUrl)) {
   throw new Error("VITE_API_BASE_URL must be an absolute HTTP(S) URL");
@@ -9,7 +9,7 @@ if (configuredBaseUrl && !/^https?:\/\/[^/]+(?:\/[^?#]*)?$/.test(configuredBaseU
 if (import.meta.env.PROD && configuredBaseUrl?.startsWith("http://")) {
   throw new Error("Production API must use HTTPS or a same-origin reverse proxy");
 }
-const baseUrl = (configuredBaseUrl || "").replace(/\/$/, "");
+const baseUrl = (configuredBaseUrl || (import.meta.env.DEV ? "http://localhost:8000" : "")).replace(/\/$/, "");
 let accessToken: string | null = null;
 
 export function setAccessToken(token: string | null) { accessToken = token; }
