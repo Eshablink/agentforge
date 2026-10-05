@@ -13,11 +13,12 @@ from sqlalchemy.orm import Session
 
 from app.core.rate_limit import RateLimitExceeded, ai_request_limiter
 from app.core.settings import get_settings
-from app.core.telemetry import new_request_id, record, set_request_id, reset_request_id
+from app.core.telemetry import new_request_id, record, set_request_id
 from app.db.dependencies import get_db
 from app.models.conversation import Conversation, Message
 from app.models.user import User
 from app.schemas.platform import AgentChatRequest
+from app.schemas.stream import StreamEvent
 from app.services.agent_provider import FakeDecisionProvider, OpenAIDecisionProvider
 from app.services.auth_service import current_user
 from app.services.retrieval_service import RetrievalService
@@ -109,11 +110,10 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
             record("agent_stream_complete", request_id=request_id, latency_ms=round((time.perf_counter() - started) * 1000, 3), success=completed)
         except asyncio.CancelledError:
             record("agent_stream_cancelled", request_id=request_id, latency_ms=round((time.perf_counter() - started) * 1000, 3)); raise
-        finally:
-            pass
 
     return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Request-Id": request_id})
 
 
 def _sse(event: str, data: dict) -> str:
-    return f"event: {event}\ndata: {json.dumps(data, separators=(',', ':'))}\n\n"
+    typed = StreamEvent(event=event, data=data)
+    return f"event: {typed.event}\ndata: {json.dumps(typed.data, separators=(',', ':'))}\n\n"
