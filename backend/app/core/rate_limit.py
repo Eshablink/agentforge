@@ -34,8 +34,13 @@ class SlidingWindowLimiter:
             if len(events) >= self.limit:
                 raise RateLimitExceeded("AI request rate limit exceeded")
             events.append(current)
-            # Bound stale keys under client churn.
             if len(self._events) > 10000:
                 stale = [item for item, stamps in self._events.items() if not stamps or stamps[-1] <= cutoff]
                 for item in stale[:5000]:
                     self._events.pop(item, None)
+
+
+# Shared instance used by both streaming and non-streaming AI endpoints.
+from app.core.settings import get_settings
+
+ai_request_limiter = SlidingWindowLimiter(get_settings().ai_requests_per_minute, 60)
