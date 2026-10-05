@@ -1,6 +1,6 @@
 # AgentForge Decisions
 
-This file records decisions implemented in the Phase 0–6 foundation. Verification is tied to specific GitHub Actions runs/commits in `PROGRESS.md` and PR #6. Passing CI demonstrates the tested foundation, not external production deployment.
+This file records decisions implemented in the Phase 0–6 foundation and the Phase 7 additions. Verification is tied to specific GitHub Actions runs/commits in `PROGRESS.md` and the Phase 7 PR. Passing CI demonstrates the tested foundation, not external production deployment.
 
 ## ADR-001 — React + TypeScript + Vite
 - **Decision:** Use React, TypeScript and Vite for the frontend.
@@ -34,7 +34,7 @@ This file records decisions implemented in the Phase 0–6 foundation. Verificat
 
 ## ADR-007 — Minimal typed agent loop and registered tools
 - **Decision:** Use typed decisions and a bounded orchestration loop with three explicitly registered tools: retrieval-backed `document_search`, explicit Decimal arithmetic, and date offset.
-- **Reason:** Current workflow does not justify an agent framework; direct orchestration is small and auditable. Arbitrary code execution is prohibited.
+- **Reason:** Direct orchestration is small and auditable; arbitrary code execution is prohibited.
 - **Status:** Accepted; implemented and CI-tested.
 
 ## ADR-008 — Operational execution trace only
@@ -43,30 +43,47 @@ This file records decisions implemented in the Phase 0–6 foundation. Verificat
 - **Status:** Accepted; implemented.
 
 ## ADR-009 — Persistent conversations with bounded recent context
-- **Decision:** Store conversations/messages in PostgreSQL, scope them by owner, and send only a bounded recent-message window from the requested conversation.
+- **Decision:** Store conversations/messages in PostgreSQL, scope them by owner, and send only a bounded recent-message window.
 - **Reason:** Multi-turn continuity without unbounded context or cross-conversation leakage.
 - **Status:** Accepted; implemented.
 
 ## ADR-010 — Hashed passwords and revocable bearer sessions
 - **Decision:** Salt and hash passwords using PBKDF2-SHA256; issue random bearer tokens, persist only token hashes, and enforce expiry/revocation.
-- **Reason:** Avoid plaintext credentials and permit server-side logout/session invalidation.
+- **Reason:** Avoid plaintext credentials and permit server-side logout.
 - **Status:** Accepted; implemented. HTTPS/operations remain deployment requirements.
 
 ## ADR-011 — Ownership-aware documents and backward compatibility
-- **Decision:** Store nullable owner on documents; authenticated retrieval and conversation queries filter by user ID. Legacy Phase 3 routes can access only unowned legacy records.
-- **Reason:** Preserve existing single-user records and API compatibility without exposing new private documents.
-- **Status:** Accepted; implemented and covered by PostgreSQL integration tests.
+- **Decision:** Store nullable owner on documents; authenticated retrieval filters by user ID; legacy Phase 3 routes access only unowned legacy records.
+- **Status:** Accepted; implemented.
 
 ## ADR-012 — Isolated PostgreSQL tests
-- **Decision:** Clear test-created messages, conversations, chunks, documents, sessions and users around tests in reverse FK dependency order.
-- **Reason:** Integration handlers commit; rollback in a different session cannot clean those records.
+- **Decision:** Clear test-created rows in reverse FK order around integration tests.
 - **Status:** Accepted; implemented.
 
 ## ADR-013 — PostgreSQL-backed CI and health-gated startup
-- **Decision:** PostgreSQL + pgvector service, health check, Alembic migration, import smoke test, full pytest and TypeScript/Vite build in GitHub Actions; Docker backend migrates before serving.
-- **Reason:** Verify actual persistence/vector behavior and deterministic boot.
-- **Status:** Accepted; green run 37129401744 on application audit code; latest full verification is recorded in `PROGRESS.md`.
+- **Decision:** PostgreSQL + pgvector service, Alembic migration, import smoke test, full pytest and frontend build in GitHub Actions.
+- **Status:** Accepted; green on prior phases.
+
+## ADR-014 — Normalized provider errors and bounded retries
+- **Decision:** Map provider failures to a small safe taxonomy and bound timeouts/retries via settings (`llm_timeout_seconds`, `llm_max_retries`).
+- **Reason:** Predictable degradation without leaking secrets; no unbounded waiting.
+- **Status:** Accepted; implemented in Phase 7.
+
+## ADR-015 — SSE streaming with a typed, secret-free event contract
+- **Decision:** Add `POST /agent/chat/stream` using Server-Sent Events and a fixed event vocabulary (`message_start`, `tool_start`, `tool_result`, `retrieval`, `token`, `message_end`, `error`); keep `/agent/chat` non-streaming for backward compatibility.
+- **Reason:** Incremental UX with a stable, auditable wire contract that cannot leak chain-of-thought or secrets.
+- **Status:** Accepted; implemented in Phase 7.
+
+## ADR-016 — Process-local rate limiting with documented limits
+- **Decision:** Use a single-process sliding-window limiter rather than distributed infrastructure.
+- **Reason:** Lightweight protection of expensive endpoints without fragile shared state; deployment limitation is documented.
+- **Status:** Accepted; implemented in Phase 7 (multi-worker deployments require a gateway/shared store).
+
+## ADR-017 — Deterministic version-controlled evaluation suite
+- **Decision:** Keep RAG/tool/agent regression datasets in Git and run them via a deterministic runner with fake providers; exit non-zero on failure; integrate into CI.
+- **Reason:** Reproducible, credential-free regression coverage.
+- **Status:** Accepted; implemented in Phase 7.
 
 ## Deferred scope
 
-No SSO/MFA, formal rate limiting, billing, advanced analytics, cloud/Kubernetes deployment or Phase 7+ implementation. This is not a deployed production service.
+SSO/MFA, deployed cloud/Kubernetes operations, billing, advanced analytics, and distributed (multi-process) rate limiting remain deferred. This is not a deployed production service.
