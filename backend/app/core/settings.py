@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from urllib.parse import urlparse
-
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
-
 from app.core.constants import EMBEDDING_DIMENSION_DEFAULT, EMBEDDING_MODEL_DEFAULT, LLM_MODEL_DEFAULT, SUPPORTED_EMBEDDING_DIMENSIONS
 
 
@@ -48,7 +46,6 @@ class Settings(BaseSettings):
     max_stream_output_chars: int = 12000
     rate_limit_backend: str = "memory"
     redis_url: str | None = None
-
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore")
 
     @field_validator("app_env")
@@ -118,6 +115,8 @@ class Settings(BaseSettings):
                 raise ValueError("production CORS_ORIGINS must be explicit HTTPS origins")
             if self.rate_limit_backend != "redis":
                 raise ValueError("production requires a shared rate limiter")
+            if urlparse(self.redis_url or "").scheme != "rediss":
+                raise ValueError("production REDIS_URL must use TLS (rediss://)")
             if self.llm_provider == "openai" or self.embedding_provider == "openai":
                 if not self.openai_api_key:
                     raise ValueError("OPENAI_API_KEY required for selected provider")
