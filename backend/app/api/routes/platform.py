@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import RateLimitExceeded, SlidingWindowLimiter
 from app.core.settings import get_settings
+from app.core.telemetry import record
 from app.db.dependencies import get_db
 from app.models.conversation import Conversation, Message
 from app.models.user import User
@@ -23,6 +25,14 @@ from app.services.retrieval_service import RetrievalService
 from app.services.tool_registry import ToolRegistry
 
 router = APIRouter(tags=["identity", "conversations", "agent"])
+_ai_limiter = SlidingWindowLimiter(get_settings().ai_requests_per_minute, 60)
+
+
+def _check_ai_limit(user: User) -> None:
+    try:
+        _ai_limiter.check(str(user.id))
+    except RateLimitExceeded as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
 
 def _service(db: Session) -> AgentOrchestrationService:
@@ -57,9 +67,7 @@ def logout(db: Session = Depends(get_db), user: User = Depends(current_user)) ->
 @router.post("/conversations", response_model=ConversationResponse, status_code=status.HTTP_201_CREATED)
 def create_conversation(payload: ConversationCreateRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> ConversationResponse:
     conversation = Conversation(user_id=user.id, title=payload.title)
-    db.add(conversation)
-    db.commit()
-    db.refresh(conversation)
+    db.add(conversation); db.commit(); db.refresh(conversation)
     return ConversationResponse(id=conversation.id, title=conversation.title, created_at=conversation.created_at, updated_at=conversation.updated_at, messages=[])
 
 
@@ -78,32 +86,19 @@ def _owned_conversation(db: Session, user: User, conversation_id: UUID) -> Conve
 
 def _memory_context(db: Session, conversation: Conversation) -> str:
     settings = get_settings()
-    recent = db.scalars(
-        select(Message)
-        .where(Message.conversation_id == conversation.id)
-        .order_by(Message.created_at.desc(), Message.id.desc())
-        .limit(settings.max_conversation_messages)
-    ).all()
+    recent = db.scalars(select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at.desc(), Message.id.desc()).limit(settings.max_conversation_messages)).all()
     return "\n".join(f"{message.role}: {message.content[:1200]}" for message in reversed(recent))[-settings.max_conversation_context_chars:]
 
 
 def _persist_exchange(db: Session, conversation: Conversation, question: str, result: AgentChatResponse) -> None:
     db.add_all([
         Message(conversation_id=conversation.id, role="user", content=question),
-        Message(
-            conversation_id=conversation.id,
-            role="assistant",
-            content=result.answer,
-            metadata_json={
-                "answer_kind": result.answer_kind,
-                "tools_used": result.tools_used,
-                "sources": [source.model_dump(mode="json") for source in result.sources],
-                "events": [event.model_dump() for event in result.events],
-            },
-        ),
+        Message(conversation_id=conversation.id, role="assistant", content=result.answer,
+                metadata_json={"answer_kind": result.answer_kind, "tools_used": result.tools_used,
+                               "sources": [source.model_dump(mode="json") for source in result.sources],
+                               "events": [event.model_dump() for event in result.events]}),
     ])
-    conversation.updated_at = datetime.now(timezone.utc)
-    db.commit()
+    conversation.updated_at = datetime.now(timezone.utc); db.commit()
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationResponse)
@@ -115,9 +110,7 @@ def get_conversation(conversation_id: UUID, db: Session = Depends(get_db), user:
 
 @router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db), user: User = Depends(current_user)) -> Response:
-    conversation = _owned_conversation(db, user, conversation_id)
-    db.delete(conversation)
-    db.commit()
+    conversation = _owned_conversation(db, user, conversation_id); db.delete(conversation); db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -126,18 +119,20 @@ def add_message(conversation_id: UUID, payload: ConversationMessageRequest, db: 
     conversation = _owned_conversation(db, user, conversation_id)
     context = _memory_context(db, conversation)
     result = _service(db).run(payload.content, context=context, user_id=user.id).response()
-    _persist_exchange(db, conversation, payload.content, result)
-    db.refresh(conversation)
+    _persist_exchange(db, conversation, payload.content, result); db.refresh(conversation)
     messages = [MessageResponse(id=m.id, role=m.role, content=m.content, created_at=m.created_at) for m in conversation.messages]
     return ConversationResponse(id=conversation.id, title=conversation.title, created_at=conversation.created_at, updated_at=conversation.updated_at, messages=messages)
 
 
 @router.post("/agent/chat", response_model=AgentChatResponse)
 def agent_chat(payload: AgentChatRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> AgentChatResponse:
+    _check_ai_limit(user)
+    if len(payload.question) > get_settings().max_prompt_chars:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Prompt exceeds maximum allowed size")
     conversation = _owned_conversation(db, user, payload.conversation_id) if payload.conversation_id is not None else None
     context = _memory_context(db, conversation) if conversation is not None else ""
     result = _service(db).run(payload.question, context=context, user_id=user.id).response()
     if conversation is not None:
-        _persist_exchange(db, conversation, payload.question, result)
-        result.conversation_id = conversation.id
+        _persist_exchange(db, conversation, payload.question, result); result.conversation_id = conversation.id
+    record("agent_chat_complete", endpoint="/agent/chat", success=result.answer_kind != "INSUFFICIENT_EVIDENCE")
     return result
