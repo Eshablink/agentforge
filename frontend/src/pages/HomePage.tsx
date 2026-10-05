@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 
 import { apiClient, setAccessToken } from "../services/api/client";
-import type { AgentChatResponse, AppInfo, ConversationSummary, DocumentSummary, SessionResponse } from "../types/app";
+import type { AgentChatResponse, AppInfo, ConversationSummary, DocumentSummary, SessionResponse, SourceReference } from "../types/app";
 
 type Props = { apiUrl: string; appInfo: AppInfo };
 
@@ -17,7 +17,9 @@ export function HomePage({ apiUrl, appInfo }: Props) {
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<AgentChatResponse | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => { if (session) void refreshData(); }, [session]);
 
@@ -60,21 +62,57 @@ export function HomePage({ apiUrl, appInfo }: Props) {
   }
 
   async function sendMessage(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault(); if (!question.trim()) return;
-    setBusy(true); setError(null);
+    event.preventDefault(); if (!question.trim() || busy) return;
+    const prompt = question.trim();
+    setQuestion(""); setBusy(true); setError(null); setActiveTool(null);
+    setAnswer({ answer: "", answer_kind: "INSUFFICIENT_EVIDENCE", sources: [], tools_used: [], events: [], conversation_id: activeConversation });
+    const controller = new AbortController(); abortRef.current = controller;
+    let tokenText = "";
+    let finalSources: SourceReference[] = [];
+    let finalKind: AgentChatResponse["answer_kind"] = "INSUFFICIENT_EVIDENCE";
+    let toolsUsed: string[] = [];
     try {
-      const result = await apiClient.agentChat(question.trim(), activeConversation ?? undefined);
-      setAnswer(result); setQuestion("");
+      await apiClient.streamAgentChat(prompt, activeConversation ?? undefined, (event, data) => {
+        if (event === "token") {
+          tokenText += data.text ?? "";
+          setAnswer((current) => current ? { ...current, answer: tokenText } : current);
+        } else if (event === "tool_start") {
+          setActiveTool(data.tool ?? "tool");
+          setAnswer((current) => current ? { ...current, events: [...current.events, { event: "tool_start", tool: data.tool }] } : current);
+        } else if (event === "tool_result") {
+          setActiveTool(null);
+          setAnswer((current) => current ? { ...current, events: [...current.events, { event: "tool_result", tool: data.tool, detail: data.status }] } : current);
+        } else if (event === "retrieval") {
+          setAnswer((current) => current ? { ...current, events: [...current.events, { event: "retrieval", detail: `${data.count ?? 0} results` }] } : current);
+        } else if (event === "message_end") {
+          finalSources = data.sources ?? [];
+          finalKind = data.answer_kind ?? finalKind;
+          toolsUsed = data.tools_used ?? [];
+          setAnswer((current) => current ? { ...current, answer: tokenText, answer_kind: finalKind, sources: finalSources, tools_used: toolsUsed, conversation_id: data.conversation_id ?? activeConversation } : current);
+        } else if (event === "error") {
+          setError(data.message ?? "The response could not be completed.");
+        }
+      }, controller.signal);
       if (activeConversation) {
         const updated = await apiClient.getConversation(activeConversation);
         setConversations((prev) => [updated, ...prev.filter((item) => item.id !== updated.id)]);
       }
       await refreshData();
-    } catch (err) { setError((err as Error).message); }
-    finally { setBusy(false); }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") setError((err as Error).message);
+    } finally {
+      abortRef.current = null; setActiveTool(null); setBusy(false);
+    }
+  }
+
+  function cancelStream() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setBusy(false); setActiveTool(null);
   }
 
   async function logout() {
+    cancelStream();
     try { await apiClient.logout(); }
     catch (err) { setError((err as Error).message); }
     finally { setAccessToken(null); setSession(null); setDocuments([]); setConversations([]); setActiveConversation(null); setAnswer(null); }
@@ -107,8 +145,8 @@ export function HomePage({ apiUrl, appInfo }: Props) {
         {activeConversation && <p className="meta">Open conversation: {activeConversation}</p>}
       </section>
       {activeConversation && <section className="panel"><h2>Recent conversation</h2>{conversations.find((c) => c.id === activeConversation)?.messages.map((message) => <p key={message.id}><strong>{message.role}:</strong> {message.content}</p>)}</section>}
-      <section className="panel"><h2>Ask AgentForge</h2><form onSubmit={sendMessage}><textarea rows={3} maxLength={5000} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask about your documents or a calculation" required /><button disabled={busy || (!hasDocuments && !question.trim())}>{busy ? "Working…" : "Send"}</button></form></section>
-      {answer && <section className="panel"><h2>Answer · {answer.answer_kind}</h2><p>{answer.answer}</p><h3>Tools used</h3><p>{answer.tools_used.length ? answer.tools_used.join(", ") : "None"}</p><h3>Sources</h3>{answer.sources.length ? <ul>{answer.sources.map((source) => <li key={source.chunk_id}>{source.filename} — chunk {source.chunk_index} — similarity {source.similarity.toFixed(4)}</li>)}</ul> : <p>No document sources.</p>}<details><summary>Execution trace</summary><ol>{answer.events.map((item, index) => <li key={`${item.event}-${index}`}>{item.event}{item.tool ? ` · ${item.tool}` : ""}{item.detail ? ` · ${item.detail}` : ""}</li>)}</ol></details></section>}
+      <section className="panel"><h2>Ask AgentForge</h2><form onSubmit={sendMessage}><textarea rows={3} maxLength={5000} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="Ask about your documents or a calculation" required disabled={busy} /><button disabled={busy || (!hasDocuments && !question.trim())}>{busy ? "Streaming…" : "Send"}</button>{busy && <button type="button" onClick={cancelStream}>Cancel</button>}</form>{activeTool && <p role="status" className="meta">Working with {activeTool}…</p>}</section>
+      {answer && <section className="panel"><h2>Answer · {answer.answer_kind}</h2><p aria-live="polite">{answer.answer || (busy ? "Thinking…" : "")}</p><h3>Tools used</h3><p>{answer.tools_used.length ? answer.tools_used.join(", ") : activeTool ?? "None"}</p><h3>Sources</h3>{answer.sources.length ? <ul>{answer.sources.map((source) => <li key={source.chunk_id}>{source.filename} — chunk {source.chunk_index} — similarity {source.similarity.toFixed(4)}</li>)}</ul> : <p>No document sources.</p>}<details><summary>Activity</summary><ol>{answer.events.map((item, index) => <li key={`${item.event}-${index}`}>{item.event}{item.tool ? ` · ${item.tool}` : ""}{item.detail ? ` · ${item.detail}` : ""}</li>)}</ol></details></section>}
       {error && <p className="error">{error}</p>}
     </section></main>
   );
