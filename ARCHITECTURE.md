@@ -1,15 +1,15 @@
 # AgentForge Architecture
 
-## Current verified architecture — Phases 0–6
+## Current verified architecture — Phases 0–7
 
-Phases 0–3 provide the document-RAG foundation. Phases 4–6 add registered safe tools, persistent user-owned conversations, and authentication/authorization. The implementation is CI-verified on PR #6; this is a production-oriented foundation, not a deployed service.
+Phases 0–3 provide the document-RAG foundation. Phases 4–6 add registered safe tools, persistent user-owned conversations, and authentication/authorization. Phase 7 adds provider reliability, authenticated SSE streaming, lightweight observability, and a deterministic evaluation suite — all additive.
 
 ```text
 React + TypeScript + Vite
-        ↓ HTTP + bearer token
+        ↓ HTTP + bearer token (SSE for streaming)
 FastAPI routes and typed schemas
         ↓
-Authentication / owner authorization
+Request-ID middleware / authentication / owner authorization
         ↓
 Conversation service (bounded recent context)
         ↓
@@ -23,43 +23,48 @@ Allowlisted tool registry
 PostgreSQL + pgvector (Alembic-managed schema)
 ```
 
-## Preserved Phase 3 data paths
+## Phase 7 additions
 
-PDF/TXT/Markdown upload → validation/extraction → deterministic chunks → embedding abstraction → transactional PostgreSQL persistence. Query → embedding → the existing pgvector cosine retrieval service → context → grounded LLM answer and source references.
+### Provider reliability
 
-For authenticated requests, `user_id` flows through agent → document-search tool → retrieval query, which filters on owner. Legacy `/documents` and `/chat` paths are retained for compatibility with unowned legacy rows only. The agent does not duplicate vector search.
+`app/services/provider_errors.py` defines a normalized error taxonomy (`provider_timeout`, `provider_rate_limited`, `provider_auth`, `provider_unavailable`, `provider_invalid_response`, `provider_config`). `app/services/provider_utils.py` provides bounded retry with classification. `LLMService` and `OpenAIDecisionProvider` apply explicit `llm_timeout_seconds` / `llm_max_retries` and convert failures to safe messages; secrets never appear in logs or responses.
 
-## Agent controls
+### Streaming (SSE)
 
-| Group | Count | Control |
-|---|---:|---|
-| Agent | 1 | Structured validated provider decision; model output is untrusted |
-| Tools | 2 | Allowlist: document search, calculator, date offset |
-| Validation | 3 | Typed per-tool arguments; unknown tools and extra/invalid arguments rejected |
-| Limits | 4 | Bounded iterations, calls, `top_k`, chunks, text, tool results and trace events |
-| Execution | 5 | No arbitrary Python, shell, filesystem, generated SQL or unrestricted network |
-| Trace | 6 | Operational events only; no chain-of-thought or secrets |
+`POST /agent/chat/stream` (in `app/api/routes/stream.py`) emits a typed event stream via `app/schemas/stream.py`:
 
-The RAG tool calls the existing `RetrievalService`. Provider abstractions permit external integrations; deterministic fakes are used in CI.
+| Event | Payload | Notes |
+|---|---|---|
+| `message_start` | request_id, conversation_id | |
+| `tool_start` | tool | allowlisted tool name |
+| `tool_result` | tool, status | safe status only |
+| `retrieval` | count | bounded count |
+| `token` | text | incremental assistant output |
+| `message_end` | answer_kind, tools_used, sources | final state |
+| `error` | message, code | safe, bounded error |
 
-## Authentication, ownership and conversation memory
+No chain-of-thought, no secrets, no prompt text. The non-streaming `/agent/chat` endpoint remains unchanged. Ownership checks and bounded output are preserved for streaming.
 
-Passwords use salted PBKDF2-SHA256 hashes. Random bearer credentials are returned to the browser while only their hashes are stored; server-side expiry and revocation are checked per request. Protected document, chat, agent and conversation APIs derive user identity from the auth dependency and scope records by `user_id`; foreign conversation IDs return not found.
+### Observability
 
-Messages are stored in PostgreSQL. Memory includes only a bounded recent window from the requested owned conversation, ordered by timestamp and ID and limited by message count/character count. User/assistant turns persist in one transaction. The browser stores tokens in memory, so a reload requires sign-in.
+`app/core/telemetry.py` provides request-ID context and a sanitized `record()` helper; `app/main.py` adds request-ID middleware so every response carries `X-Request-Id`. Only bounded, non-sensitive operational metadata is logged.
 
-## Database and migrations
+### Rate/resource protection
 
-| Group | Count | Table/component | Role |
-|---|---:|---|---|
-| Data | 1 | `users`, `auth_sessions` | User account, password hash, hashed bearer token, expiry/revocation |
-| Data | 2 | `documents`, `document_chunks` | Nullable owner for legacy rows; text, metadata and pgvector embeddings |
-| Data | 3 | `conversations`, `messages` | Per-user history and bounded operational metadata |
-| Data | 4 | SQLAlchemy 2.x + PostgreSQL/pgvector | ORM and vector queries |
-| Schema | 5 | Alembic | Deterministic incremental migrations; existing pgvector schema preserved |
+`app/core/rate_limit.py` provides a process-local sliding-window limiter (per-user) used by the streaming endpoint; settings add `ai_requests_per_minute`, `max_prompt_chars`, `max_stream_duration_seconds`, and `max_stream_output_chars`. This is single-process only; a gateway/shared store is required for multiple workers.
 
-Alembic imports registered models using the standalone `app.db.base`; integration checks use PostgreSQL + pgvector, not SQLite. Docker waits for DB health and applies migrations before API startup.
+### Evaluation
 
-## Verification and deferred scope
+`evaluation/datasets/*.json` hold version-controlled RAG/tool/agent regression cases; `evaluation/runner/run_evals.py` runs them deterministically with fake providers, prints PASS/FAIL, and exits non-zero on failure.
 
-The latest code and docs CI result should be taken from the current PR #6 head. CI provisions PostgreSQL + pgvector, applies Alembic, checks import, runs full pytest and builds the frontend. This project is not externally deployed. SSO/MFA, formal rate limiting, HTTPS/reverse proxy operations, monitoring, cloud/Kubernetes, billing, analytics and Phase 7+ remain deferred.
+## Preserved Phase 3–6 data paths
+
+Document ingestion, owner-filtered retrieval, conversations, auth, and security boundaries remain as documented in PR #6; Phase 7 does not alter them.
+
+## Security boundaries
+
+No arbitrary Python, shell, filesystem, generated SQL, or unrestricted network tools. Model output is untrusted; only typed, allowlisted tools execute. Operational traces and SSE frames exclude chain-of-thought and secrets. User-owned documents and conversations stay isolated by authenticated user ID.
+
+## Known limitations
+
+Single-process rate limiting and request-ID context; streaming persists the full exchange only after the stream completes. HTTPS/reverse proxy, SSO/MFA, cloud/Kubernetes, billing, and advanced analytics remain deferred.
