@@ -7,6 +7,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from app.core.settings import get_settings
+from app.services.provider_errors import ProviderError
+from app.services.provider_utils import run_bounded
+
 
 class CalculatorInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
@@ -87,11 +91,17 @@ class FakeDecisionProvider(LLMDecisionProvider):
 class OpenAIDecisionProvider(LLMDecisionProvider):
     def __init__(self, api_key: str, model: str) -> None:
         from openai import OpenAI
-        self.client = OpenAI(api_key=api_key)
+        settings = get_settings()
+        self.client = OpenAI(
+            api_key=api_key,
+            timeout=settings.llm_timeout_seconds,
+            max_retries=0,
+        )
         self.model = model
+        self.settings = settings
 
     def decide(self, request: DecisionRequest) -> AgentDecision:
-        try:
+        def _call() -> AgentDecision:
             response = self.client.chat.completions.create(
                 model=self.model,
                 temperature=0,
@@ -111,8 +121,16 @@ class OpenAIDecisionProvider(LLMDecisionProvider):
             )
             content = response.choices[0].message.content or "{}"
             return AgentDecision.model_validate_json(content)
-        except Exception as exc:
-            raise ValueError("Provider returned an invalid or unavailable decision") from exc
+
+        try:
+            return run_bounded(
+                _call,
+                timeout_seconds=self.settings.llm_timeout_seconds,
+                max_retries=self.settings.llm_max_retries,
+            )
+        except ProviderError as exc:
+            # Keep the safe, normalized message; never leak raw provider details.
+            raise ValueError(str(exc)) from exc
 
 
 def calculate(payload: CalculatorInput) -> dict:
