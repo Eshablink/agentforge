@@ -26,11 +26,11 @@ def test_stream_returns_sse_events_for_calculator() -> None:
     headers = _register_login(f"stream-{uuid.uuid4().hex}@example.com")
     resp = client.post("/agent/chat/stream", json={"question": "7 * 8"}, headers=headers)
     assert resp.status_code == 200
-    content_type = resp.headers.get("content-type", "")
-    assert "text/event-stream" in content_type
+    assert "text/event-stream" in resp.headers.get("content-type", "")
     assert "X-Request-Id" in resp.headers
     body = resp.text
     assert "event: message_start" in body
+    assert "event: tool_start" in body
     assert "event: token" in body
     assert "event: message_end" in body
 
@@ -41,3 +41,22 @@ def test_stream_does_not_leak_secrets_in_body() -> None:
     body = resp.text.lower()
     assert "sk-" not in body
     assert "bearer" not in body
+
+
+def test_stream_enforces_conversation_ownership() -> None:
+    owner = _register_login(f"stream-owner-{uuid.uuid4().hex}@example.com")
+    other = _register_login(f"stream-other-{uuid.uuid4().hex}@example.com")
+    created = client.post("/conversations", json={"title": "private"}, headers=owner)
+    assert created.status_code == 201
+    response = client.post(
+        "/agent/chat/stream",
+        json={"question": "7 * 8", "conversation_id": created.json()["id"]},
+        headers=other,
+    )
+    assert response.status_code == 404
+
+
+def test_stream_rejects_oversized_prompt() -> None:
+    headers = _register_login(f"stream-limit-{uuid.uuid4().hex}@example.com")
+    response = client.post("/agent/chat/stream", json={"question": "x" * 5001}, headers=headers)
+    assert response.status_code == 422 or response.status_code == 413
