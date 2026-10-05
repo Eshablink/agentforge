@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.rate_limit import RateLimitExceeded, SlidingWindowLimiter
+from app.core.rate_limit import RateLimitExceeded, SlidingWindowLimiter, ai_request_limiter
 from app.core.settings import get_settings
 from app.core.telemetry import record
 from app.db.dependencies import get_db
@@ -25,7 +25,7 @@ from app.services.retrieval_service import RetrievalService
 from app.services.tool_registry import ToolRegistry
 
 router = APIRouter(tags=["identity", "conversations", "agent"])
-_ai_limiter = SlidingWindowLimiter(get_settings().ai_requests_per_minute, 60)
+_ai_limiter = ai_request_limiter
 
 
 def _check_ai_limit(user: User) -> None:
@@ -116,6 +116,10 @@ def delete_conversation(conversation_id: UUID, db: Session = Depends(get_db), us
 
 @router.post("/conversations/{conversation_id}/messages", response_model=ConversationResponse)
 def add_message(conversation_id: UUID, payload: ConversationMessageRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> ConversationResponse:
+    _check_ai_limit(user)
+    settings = get_settings()
+    if len(payload.content) > settings.max_prompt_chars:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Prompt exceeds maximum allowed size")
     conversation = _owned_conversation(db, user, conversation_id)
     context = _memory_context(db, conversation)
     result = _service(db).run(payload.content, context=context, user_id=user.id).response()
