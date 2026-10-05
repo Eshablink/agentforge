@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.core.rate_limit import RateLimitExceeded, ai_request_limiter
 from app.core.settings import get_settings
-from app.core.telemetry import new_request_id, record, set_request_id
+from app.core.telemetry import record
 from app.db.dependencies import get_db
 from app.models.conversation import Conversation, Message
 from app.models.user import User
@@ -74,7 +74,11 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
                 raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Request body exceeds maximum allowed size")
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Content-Length") from exc
-    request_id = new_request_id()
+
+    # Reuse the single canonical request ID created by the middleware so
+    # message_start.request_id, the X-Request-Id header, and telemetry agree.
+    request_id = getattr(request.state, "request_id", None)
+
     try:
         ai_request_limiter.check(str(user.id))
     except RateLimitExceeded as exc:
@@ -92,6 +96,9 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
             answer_kind = "INSUFFICIENT_EVIDENCE"
             tools_used: list[str] = []
             sources: list[dict] = []
+            # The route owns the request-level message_start event (it knows the
+            # canonical request ID and conversation ID). The service emits only
+            # operational events (tool/retrieval/token/message_end/error).
             yield _sse("message_start", {"request_id": request_id, "conversation_id": str(conversation.id) if conversation else None})
             for event_name, data in service.stream(payload.question, context=context, user_id=user.id):
                 if event_name == "token":
