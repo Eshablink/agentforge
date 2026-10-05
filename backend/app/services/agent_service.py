@@ -4,8 +4,8 @@ import time
 import uuid
 from dataclasses import dataclass
 
-from app.core.observability import record
 from app.core.settings import get_settings
+from app.core.telemetry import record
 from app.schemas.platform import AgentChatResponse, AgentEvent, AgentSource
 from app.services.agent_provider import DecisionRequest, FakeDecisionProvider, LLMDecisionProvider
 from app.services.tool_registry import MAX_AGENT_STEPS, MAX_TRACE_EVENTS, MAX_TOOLS_PER_REQUEST, ToolError, ToolRegistry
@@ -86,5 +86,5 @@ class AgentOrchestrationService:
             record("provider_call", provider=type(self.provider).__name__, success=False, error_category="provider_failure")
             events.append(AgentEvent(event="safe_error", detail="Agent provider unavailable or returned an invalid decision"))
             answer = "The agent could not complete the request safely. Please try again."; answer_kind = "INSUFFICIENT_EVIDENCE"
-        record("agent_request", latency_ms=round((time.perf_counter() - started) * 1000, 3), success=finished, error_category=None if finished else "agent_failure", tool_count=len(tool_names))
+        record("agent_request", latency_ms=round((time.perf_counter() - started) * 1000, 3), success=finished, tool_count=len(tool_names))
         return AgentResult(answer=answer, answer_kind=answer_kind, sources=list(source_map.values())[:20], tools_used=tool_names[:MAX_TOOLS_PER_REQUEST], events=events[:MAX_TRACE_EVENTS])
