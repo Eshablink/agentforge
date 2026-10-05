@@ -74,11 +74,9 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Content-Length") from exc
     request_id = new_request_id()
-    token = set_request_id(request_id)
     try:
         ai_request_limiter.check(str(user.id))
     except RateLimitExceeded as exc:
-        reset_request_id(token)
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
     conversation = _owned_conversation(db, user, payload.conversation_id) if payload.conversation_id is not None else None
@@ -87,6 +85,7 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
     started = time.perf_counter()
 
     async def event_generator():
+        completed = False
         try:
             answer_parts: list[str] = []
             answer_kind = "INSUFFICIENT_EVIDENCE"
@@ -100,17 +99,18 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
                     answer_kind = data.get("answer_kind", answer_kind)
                     tools_used = data.get("tools_used", tools_used)
                     sources = data.get("sources", sources)
+                    completed = True
                 yield _sse(event_name, data)
-            if conversation is not None:
+            if conversation is not None and completed:
                 try:
                     _persist_exchange(db, conversation, payload.question, "".join(answer_parts)[:settings.max_stream_output_chars], answer_kind, tools_used, sources)
                 except Exception:
-                    db.rollback(); record("agent_stream_persist_error", user_id=str(user.id))
-            record("agent_stream_complete", latency_ms=round((time.perf_counter() - started) * 1000, 3), success=True)
+                    db.rollback(); record("agent_stream_persist_error", request_id=request_id, user_id=str(user.id))
+            record("agent_stream_complete", request_id=request_id, latency_ms=round((time.perf_counter() - started) * 1000, 3), success=completed)
         except asyncio.CancelledError:
-            record("agent_stream_cancelled", latency_ms=round((time.perf_counter() - started) * 1000, 3)); raise
+            record("agent_stream_cancelled", request_id=request_id, latency_ms=round((time.perf_counter() - started) * 1000, 3)); raise
         finally:
-            reset_request_id(token)
+            pass
 
     return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Request-Id": request_id})
 
