@@ -1,65 +1,29 @@
-# AgentForge — Engineering Instructions
+# AgentForge Engineering Instructions
 
-## Project identity and verified state
+## Project state
 
 Repository: `Eshablink/agentforge`.
 
-AgentForge is a full-stack document question-answering application. The repository currently contains completed Phase 0–3 work:
+**Verified implementation:** Phases 0–3 are complete. The Phase 4–6 implementation and release-readiness audit are on `feat/agentforge-phases-4-6`. GitHub Actions run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744) passed backend and frontend jobs on audit-hardened application commit `445eb36f512e33160df5916e45e1a8f80306903a`; the latest full run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888) passed backend and frontend on commit `3ddffd055739611e405c206b17d7931d2bb93374`. PR #6 remains open and unmerged. Verification is commit-specific; rerun CI after later application changes.
 
-- **Phase 0 — Repository setup and project blueprint:** complete.
-- **Phase 1 — Application foundation:** complete and merged into `main`.
-- **Phase 2 — PostgreSQL + pgvector foundation:** implemented and verified.
-- **Phase 3 — Document ingestion + RAG foundation:** implemented and verified.
+Implemented in Phases 4–6: bounded agent orchestration; structured decisions; allowlisted document-search, calculator, and date tools; PostgreSQL conversations with bounded context; PBKDF2 password hashes; hashed bearer sessions with expiry/revocation; owned documents and conversations; owner-filtered pgvector retrieval; and React auth/conversation/agent UI.
 
-Phase 2–3 verification was performed by GitHub Actions on PR #3 before its merge: PostgreSQL + pgvector service, Alembic migration, application import smoke test, backend pytest suite, and frontend production build passed. The documented CI runs are PR run 37117613154 and push run 37117610042 on commit `7f77050e739047bc19d955cdc2498054c228b7d4`; subsequent documentation commit `9099462e914c40d843f6080f96efd016802bdd80` also had successful push and PR checks. Treat verification claims as tied to reported run/commit; rerun CI for later code changes.
-
-### Current scope
-
-Implemented: FastAPI APIs; React/TypeScript/Vite frontend; PostgreSQL with pgvector; SQLAlchemy 2.x; Alembic; PDF/TXT/Markdown extraction; deterministic chunking; embedding and LLM abstractions with fake providers for automated tests; vector retrieval; grounded RAG answers with source references; Docker Compose support; PostgreSQL-backed integration tests and GitHub Actions CI.
-
-Not implemented: autonomous agents, tool-calling workflows, authentication/authorization, complex conversation history, multi-tenancy, billing, or production deployment. These remain future work; do not begin a future phase unless explicitly requested.
+This is a production-oriented foundation, not a deployed service. Browser tokens are memory-only, so reload requires sign-in. Legacy Phase 3 endpoints are retained for unowned records. SSO/MFA, rate limiting, cloud deployment, billing, monitoring, and Phase 7+ remain deferred.
 
 ## Engineering method
 
-Work as a disciplined software engineer. Before changes:
-
-1. Inspect the current branch, relevant code, tests, workflows, and documentation.
-2. Understand existing behavior and boundaries before editing.
-3. Make the smallest focused change that addresses the requested issue.
-4. Preserve public interfaces unless a change is explicitly required.
-5. Add or update tests that demonstrate changed behavior.
-6. Run relevant tests, builds, and checks; do not claim success without actual results.
-7. Update documentation only to match implemented and verified state.
-8. Review the diff for unrelated changes, secrets, and regressions.
-
-Do not restart completed phases, refactor unrelated code, introduce speculative features, or describe future functionality as implemented.
+Inspect current code, tests, migrations, workflows, and docs before editing. Preserve working behavior and interfaces except as required by scope. Make focused changes, add regression tests, run relevant checks, and review the diff. Do not restart completed phases, add unrelated features, or claim verification without actual results.
 
 ## Architecture and data boundaries
 
-Keep UI, API, services, models, database, and provider integrations independently understandable. PostgreSQL + pgvector is the supported runtime/test database; do not substitute SQLite for database or vector integration tests. Runtime embedding dimension and migration schema must remain aligned; migrations must not depend on arbitrary runtime dimension environment values. Alembic imports mapped model modules explicitly while the declarative base remains independently defined.
+Keep UI, API, auth/authorization, conversation services, agent orchestration, providers, tools, retrieval, and persistence separate. Use PostgreSQL + pgvector for integration tests; never substitute SQLite. Reuse existing retrieval and keep Alembic deterministic/model registration acyclic.
 
-Tests that write committed PostgreSQL document data must be isolated from other tests. Preserve real pgvector cosine-similarity coverage. Automated tests use fake providers and must not require a paid LLM/embedding API.
+Treat user/model input as untrusted. Only registered, typed, validated tools may execute. No generated code, arbitrary SQL, shell, filesystem, or unrestricted network execution. Never expose hidden reasoning. Bound requests, context, tool output, and trace size. Enforce ownership for user-specific resources.
 
-Use a deterministic migration path for fresh Docker startup. Handle ingestion failures with rollback and controlled service/API errors. Never expose raw internal exceptions unnecessarily.
+## Security and testing
 
-## Code quality and security
+Never store plaintext passwords or raw bearer tokens. Enforce expiry and revocation. Production requires explicit CORS origins and credentials for selected external providers. Keep secrets out of Git/logs; `.env.example` uses placeholders.
 
-Prefer clear naming, small modules, explicit interfaces, validation, type safety, focused error handling, and testable code. Avoid unnecessary dependencies, dead code, duplicated logic, hard-coded secrets, broad exception leakage, and import hacks that hide architectural problems.
+Tests use fake providers and PostgreSQL + pgvector. Maintain cross-user isolation and test cleanup for committed rows. For relevant changes, run Alembic, import smoke test, full backend pytest, and frontend production build.
 
-Never commit API keys, passwords, access tokens, private credentials, or production secrets. Use environment variables and safe `.env.example` placeholders.
-
-## Testing requirements
-
-Meaningful behavior requires tests. Before declaring a change complete, run all relevant checks, including PostgreSQL + pgvector integration when database behavior changes. Verify application imports, Alembic migrations, backend pytest, and frontend production build as appropriate. Never infer tests passed from code inspection or a workflow definition; use actual run results.
-
-## Documentation
-
-Keep `README.md`, `PROJECT_BRIEF.md`, `ARCHITECTURE.md`, `PROGRESS.md`, and `DECISIONS.md` consistent with the repository. Clearly distinguish implemented/verified behavior from planned work. Record significant architecture choices in `DECISIONS.md`.
-
-## Git and delivery
-
-Use conventional, focused commits. Before committing, review changed files, run relevant checks, and ensure no secrets are included. Keep to the requested branch/PR; do not merge a PR unless explicitly asked. For documentation-only work, confirm no application behavior changed.
-
-## Reporting
-
-Summarize files changed, actual checks and results, commit/PR status, and remaining deferred work. Keep claims precise and report blockers honestly.
+Keep README, PROJECT_BRIEF, ARCHITECTURE, DECISIONS, and PROGRESS synchronized. Distinguish verified code from deployed production. Do not merge PR #6 or begin another phase without explicit authorization.

@@ -32,7 +32,7 @@ class DocumentIngestionService:
         self.chunker = TextChunker()
         self.embedding_service = EmbeddingService()
 
-    def ingest(self, file: UploadFile) -> tuple[Document, int]:
+    def ingest(self, file: UploadFile, *, user_id: uuid.UUID | None = None) -> tuple[Document, int]:
         self._validate_upload(file)
 
         try:
@@ -46,6 +46,7 @@ class DocumentIngestionService:
 
             document = Document(
                 id=uuid.uuid4(),
+                user_id=user_id,
                 filename=file.filename or "uploaded-document",
                 content_type=(file.content_type or "application/octet-stream").lower(),
                 metadata_json=extracted.metadata,

@@ -1,0 +1,86 @@
+from __future__ import annotations
+
+import uuid
+from datetime import date, timedelta
+
+from app.services.agent_provider import CalculatorInput, DateOffsetInput, DocumentSearchInput, calculate
+from app.services.retrieval_service import RetrievalService
+
+MAX_TOOL_OUTPUT = 6000
+MAX_TRACE_EVENTS = 40
+MAX_AGENT_STEPS = 5
+MAX_TOOLS_PER_REQUEST = 4
+MAX_SEARCH_RESULTS = 3
+MAX_CHUNK_TEXT = 800
+
+
+class ToolError(Exception):
+    """A safe, user-displayable tool validation or execution failure."""
+
+
+class ToolRegistry:
+    def __init__(self, retrieval_service: RetrievalService) -> None:
+        self._retrieval = retrieval_service
+        self._handlers = {
+            "document_search": (DocumentSearchInput, self._document_search),
+            "calculator": (CalculatorInput, calculate),
+            "date_offset": (DateOffsetInput, self._date_offset),
+        }
+
+    @property
+    def names(self) -> set[str]:
+        return set(self._handlers)
+
+    def execute(self, name: str, arguments: dict, *, user_id: uuid.UUID | None = None) -> dict:
+        if name not in self._handlers:
+            raise ToolError("Requested tool is not available")
+        schema, handler = self._handlers[name]
+        try:
+            payload = schema.model_validate(arguments)
+            result = handler(payload, user_id) if name == "document_search" else handler(payload)
+            return self._bound_result(result)
+        except ToolError:
+            raise
+        except Exception as exc:
+            raise ToolError("Tool request was invalid or could not be completed") from exc
+
+    def _document_search(self, payload: DocumentSearchInput, user_id: uuid.UUID | None) -> dict:
+        chunks = self._retrieval.search(payload.query, payload.top_k, user_id=user_id)
+        results = [
+            {
+                "document_id": item.document_id,
+                "filename": item.filename[:255],
+                "chunk_id": item.chunk_id,
+                "chunk_index": item.chunk_index,
+                "similarity": item.similarity,
+                "content": item.content[:MAX_CHUNK_TEXT],
+            }
+            for item in chunks[:MAX_SEARCH_RESULTS]
+        ]
+        return {
+            "tool": "document_search",
+            "results": results,
+            "truncated": len(chunks) > len(results),
+        }
+
+    @staticmethod
+    def _date_offset(payload: DateOffsetInput) -> dict:
+        day = date.today() + timedelta(days=payload.days)
+        return {"tool": "date_offset", "date": day.isoformat()}
+
+    @staticmethod
+    def _bound_result(value: dict) -> dict:
+        # Keep source-bearing document results structured; do not stringify away
+        # IDs or provenance when enforcing the tool-output budget.
+        text = str(value)
+        if len(text) <= MAX_TOOL_OUTPUT:
+            return value
+        if value.get("tool") == "document_search":
+            compact = dict(value)
+            compact["results"] = [
+                {**item, "content": item.get("content", "")[:400]}
+                for item in value.get("results", [])[:2]
+            ]
+            compact["truncated"] = True
+            return compact
+        return {"tool": value.get("tool", "unknown"), "truncated": True}

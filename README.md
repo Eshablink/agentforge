@@ -1,102 +1,53 @@
-# AgentForge README
+# AgentForge
 
-Full-stack document question answering with PostgreSQL + pgvector retrieval and grounded responses with source references.
+Full-stack document intelligence application: PostgreSQL/pgvector RAG, bounded registered-tool orchestration, persistent per-user conversations, and authenticated resource ownership.
 
-## Project status
+## Phase status
 
 | Group | Count | Phase | Status |
 |---|---:|---|---|
-| Completed | 1 | Phase 0 — Repository setup and blueprint | Complete |
-| Completed | 2 | Phase 1 — Application foundation | Complete; merged into `main` |
-| Completed | 3 | Phase 2 — PostgreSQL + pgvector foundation | Implemented and CI-verified |
-| Completed | 4 | Phase 3 — Document ingestion and RAG foundation | Implemented and CI-verified |
-| Planned | 5 | Phase 4 — Agentic workflows and tool calling | Not started |
-| Deferred | 6 | Authentication, complex conversation history, multi-tenancy, billing, production deployment | Not implemented |
+| Complete | 1 | Phase 0 — Blueprint | Complete |
+| Complete | 2 | Phase 1 — Application foundation | Complete |
+| Complete | 3 | Phase 2 — PostgreSQL + pgvector | Implemented and verified |
+| Complete | 4 | Phase 3 — Ingestion + grounded RAG | Implemented and verified |
+| Complete | 5 | Phase 4 — Agent workflow and safe tools | Implemented and CI-verified on PR branch |
+| Complete | 6 | Phase 5 — Persistent conversations and bounded memory | Implemented and CI-verified on PR branch |
+| Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented and CI-verified on PR branch |
+| Deferred | 8 | SSO/MFA, rate limiting, billing, cloud production deployment, later phases | Not implemented |
 
-Phase 2–3 GitHub Actions verification passed on PR #3: run 37117613154 (PR) and 37117610042 (push), commit `7f77050e739047bc19d955cdc2498054c228b7d4`. Follow-up documentation commit `9099462e914c40d843f6080f96efd016802bdd80` also had successful PR/push CI. Subsequent code changes must be verified by fresh checks.
+### Verification evidence
+
+- Phase 4–6 audit-hardened implementation commit `445eb36f512e33160df5916e45e1a8f80306903a`: GitHub Actions run [37129401744](https://github.com/Eshablink/agentforge/actions/runs/37129401744) passed backend and frontend jobs.
+- Documentation follow-up runs [37129523143](https://github.com/Eshablink/agentforge/actions/runs/37129523143), [37129536765](https://github.com/Eshablink/agentforge/actions/runs/37129536765), and [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888) passed.
+- Latest documented implementation/docs head `3ddffd055739611e405c206b17d7931d2bb93374` passed in run [37130269888](https://github.com/Eshablink/agentforge/actions/runs/37130269888). Later audit-only documentation commits still require their own CI result before claiming those exact commits verified.
+
+CI provisions PostgreSQL + pgvector, applies Alembic, imports the application, runs full backend pytest and builds the frontend with TypeScript and Vite. Fake providers avoid paid API credentials.
 
 ## Implemented capabilities
 
 | Group | Count | Capability |
 |---|---:|---|
-| Backend | 1 | FastAPI health, document upload/list, and chat APIs |
-| Database | 2 | SQLAlchemy 2.x, PostgreSQL + pgvector, Alembic migrations |
-| Ingestion | 3 | PDF/TXT/Markdown extraction, upload validation, deterministic chunking, embeddings, transactional persistence |
-| Retrieval/RAG | 4 | pgvector cosine similarity, bounded `top_k`, grounded context/answers, source references |
-| Frontend | 5 | React + TypeScript + Vite upload/list/query/source display vertical slice |
-| Development/CI | 6 | Docker Compose with PostgreSQL/pgvector; CI migration, import smoke test, pytest, and frontend build |
-
-Automated tests use fake embedding and LLM providers and PostgreSQL + pgvector; no paid external API is needed.
+| Backend | 1 | FastAPI health, document, RAG chat, auth, agent and conversation APIs |
+| Data | 2 | PostgreSQL + pgvector, SQLAlchemy 2.x, Alembic |
+| Ingestion | 3 | PDF/TXT/Markdown extraction, deterministic chunking, embeddings and transactional persistence |
+| Retrieval/RAG | 4 | Owner-aware cosine retrieval, grounded context, sources and insufficient-evidence behavior |
+| Agent | 5 | Typed decisions; registered document search, Decimal calculator and date offset; bounded execution/trace |
+| Identity/memory | 6 | PBKDF2 password hashes, hashed revocable expiring bearer sessions, owned conversations, bounded recent context |
+| Frontend | 7 | Registration/login, owned documents, conversations, agent answer, sources, tools and trace |
 
 ## Local setup
 
-Copy `.env.example` to `.env` and adjust values as needed:
+Copy `.env.example`, configure development values, then run:
 
 ```bash
 cp .env.example .env
-```
-
-Run the full development stack (database becomes healthy before backend migration/startup):
-
-```bash
 docker compose up --build
 ```
 
-Frontend: `http://localhost:5173`  
-Backend: `http://localhost:8000`
+Compose waits for PostgreSQL health; the backend applies Alembic before serving. Host-based development requires PostgreSQL + pgvector, backend dependency installation and `alembic upgrade head` before starting FastAPI. The React/TypeScript/Vite frontend defaults to port 5173.
 
-For host-based backend development, start PostgreSQL with pgvector first, install dependencies, then migrate and start the API:
+## Security boundaries and limitations
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\\Scripts\\activate
-pip install -r requirements.txt
-alembic -c alembic.ini upgrade head
-uvicorn app.main:app --reload
-```
+Only registered, validated tools execute; there is no arbitrary Python, shell, filesystem, generated SQL or unrestricted network tool. User-owned documents, conversations and retrieval are filtered by authenticated identity. Legacy Phase 3 routes are restricted to unowned records. Operational traces exclude chain-of-thought and secrets.
 
-In another terminal:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-## API overview
-
-| Group | Count | Endpoint | Purpose |
-|---|---:|---|---|
-| Health | 1 | `GET /health` | API health response |
-| Documents | 2 | `POST /documents` | Upload, extract, chunk, embed, persist |
-| Documents | 3 | `GET /documents` | List documents and chunk counts |
-| RAG | 4 | `POST /chat` | Retrieve context and return grounded answer with sources |
-
-Example request:
-
-```json
-{
-  "question": "What does the document say about refunds?",
-  "top_k": 5
-}
-```
-
-## Verification commands
-
-CI uses PostgreSQL + pgvector and runs Alembic before the backend import and full pytest suite. Locally, with a reachable PostgreSQL + pgvector database:
-
-```bash
-cd backend
-alembic -c alembic.ini upgrade head
-python -c "from app.main import app; print(app.title)"
-pytest
-
-cd ../frontend
-npm install
-npm run build
-```
-
-## Scope boundary
-
-Phase 4 (agents and tool calling) has not started. Authentication/authorization, multi-tenancy, complex memory, analytics tools, and production deployment are also not implemented.
+Bearer tokens are held in browser memory; reload requires reauthentication. This is a production-oriented foundation, not a deployed production service. SSO/MFA, rate limiting, HTTPS/reverse-proxy operations, cloud deployment, billing, analytics, and later phases are deferred.
