@@ -1,9 +1,11 @@
-import { defineConfig, loadEnv } from "vite";
+import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), "VITE_");
-  const api = (env.VITE_API_BASE_URL || "").trim();
+  // The API client uses same-origin by default. Production cross-origin URLs
+  // are checked in the browser at startup; proxy /health and API paths when
+  // no explicit VITE_API_BASE_URL is provided.
+  const api = (process.env.VITE_API_BASE_URL || "").trim();
   if (mode === "production" && api && !api.startsWith("https://")) {
     throw new Error("Production VITE_API_BASE_URL must be HTTPS; omit it for same-origin proxying");
   }
