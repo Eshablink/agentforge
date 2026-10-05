@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.settings import get_settings
@@ -27,12 +26,9 @@ async def request_id_middleware(request: Request, call_next):
     token = set_request_id(request_id)
     try:
         response = await call_next(request)
-    except Exception as exc:  # pragma: no cover - safety net
-        response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
-        response.headers["X-Request-Id"] = request_id
-        raise exc
+    finally:
+        reset_request_id(token)
     response.headers["X-Request-Id"] = request_id
-    reset_request_id(token)
     return response
 
 
