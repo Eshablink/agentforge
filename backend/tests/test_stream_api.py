@@ -3,9 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-
 from fastapi.testclient import TestClient
-
 from app.main import app
 
 client = TestClient(app)
@@ -35,8 +33,7 @@ def _events(body: str) -> list[tuple[str, dict]]:
 
 
 def test_stream_requires_auth() -> None:
-    resp = client.post("/agent/chat/stream", json={"question": "7 * 8"})
-    assert resp.status_code == 401
+    assert client.post("/agent/chat/stream", json={"question": "7 * 8"}).status_code == 401
 
 
 def test_stream_returns_typed_events_one_start_and_correlated_request_id(caplog) -> None:
@@ -45,31 +42,25 @@ def test_stream_returns_typed_events_one_start_and_correlated_request_id(caplog)
     resp = client.post("/agent/chat/stream", json={"question": "7 * 8"}, headers=headers)
     assert resp.status_code == 200
     assert "text/event-stream" in resp.headers.get("content-type", "")
+    assert resp.headers["Cache-Control"] == "no-store"
+    assert resp.headers["X-Accel-Buffering"] == "no"
     events = _events(resp.text)
     names = [name for name, _ in events]
     assert names.count("message_start") == 1
     assert names[0] == "message_start"
-    assert "tool_start" in names
-    assert "token" in names
-    assert "message_end" in names
+    assert "tool_start" in names and "token" in names and "message_end" in names
     request_id = resp.headers["X-Request-Id"]
     assert events[0][1]["request_id"] == request_id
-    correlated = [
-        rec.agentforge_event
-        for rec in caplog.records
-        if hasattr(rec, "agentforge_event")
-        and rec.agentforge_event.get("event") in {"agent_request", "agent_stream_complete"}
-    ]
+    correlated = [rec.agentforge_event for rec in caplog.records if hasattr(rec, "agentforge_event")
+                  and rec.agentforge_event.get("event") in {"agent_request", "agent_stream_complete"}]
     assert correlated
     assert all(item.get("request_id") == request_id for item in correlated)
 
 
 def test_stream_does_not_leak_secrets_in_body() -> None:
     headers = _register_login(f"stream-secret-{uuid.uuid4().hex}@example.com")
-    resp = client.post("/agent/chat/stream", json={"question": "7 * 8"}, headers=headers)
-    body = resp.text.lower()
-    assert "sk-" not in body
-    assert "bearer" not in body
+    body = client.post("/agent/chat/stream", json={"question": "7 * 8"}, headers=headers).text.lower()
+    assert "sk-" not in body and "bearer" not in body
 
 
 def test_stream_enforces_conversation_ownership() -> None:
@@ -77,15 +68,11 @@ def test_stream_enforces_conversation_ownership() -> None:
     other = _register_login(f"stream-other-{uuid.uuid4().hex}@example.com")
     created = client.post("/conversations", json={"title": "private"}, headers=owner)
     assert created.status_code == 201
-    response = client.post(
-        "/agent/chat/stream",
-        json={"question": "7 * 8", "conversation_id": created.json()["id"]},
-        headers=other,
-    )
+    response = client.post("/agent/chat/stream", json={"question": "7 * 8", "conversation_id": created.json()["id"]}, headers=other)
     assert response.status_code == 404
 
 
 def test_stream_rejects_oversized_prompt() -> None:
     headers = _register_login(f"stream-limit-{uuid.uuid4().hex}@example.com")
     response = client.post("/agent/chat/stream", json={"question": "x" * 5001}, headers=headers)
-    assert response.status_code == 422 or response.status_code == 413
+    assert response.status_code in (413, 422)
