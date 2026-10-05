@@ -3,11 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.rate_limit import RateLimitExceeded, SlidingWindowLimiter, ai_request_limiter
+from app.core.rate_limit import RateLimitExceeded, ai_request_limiter
 from app.core.settings import get_settings
 from app.core.telemetry import record
 from app.db.dependencies import get_db
@@ -25,12 +25,11 @@ from app.services.retrieval_service import RetrievalService
 from app.services.tool_registry import ToolRegistry
 
 router = APIRouter(tags=["identity", "conversations", "agent"])
-_ai_limiter = ai_request_limiter
 
 
 def _check_ai_limit(user: User) -> None:
     try:
-        _ai_limiter.check(str(user.id))
+        ai_request_limiter.check(str(user.id))
     except RateLimitExceeded as exc:
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
 
@@ -129,9 +128,17 @@ def add_message(conversation_id: UUID, payload: ConversationMessageRequest, db: 
 
 
 @router.post("/agent/chat", response_model=AgentChatResponse)
-def agent_chat(payload: AgentChatRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> AgentChatResponse:
+def agent_chat(payload: AgentChatRequest, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)) -> AgentChatResponse:
+    settings = get_settings()
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > settings.max_request_body_bytes:
+                raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Request body exceeds maximum allowed size")
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Content-Length") from exc
     _check_ai_limit(user)
-    if len(payload.question) > get_settings().max_prompt_chars:
+    if len(payload.question) > settings.max_prompt_chars:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Prompt exceeds maximum allowed size")
     conversation = _owned_conversation(db, user, payload.conversation_id) if payload.conversation_id is not None else None
     context = _memory_context(db, conversation) if conversation is not None else ""
