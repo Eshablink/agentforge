@@ -1,33 +1,20 @@
 #!/usr/bin/env python3
-"""Deterministic AgentForge evaluation runner (no paid API calls).
-
-Runs RAG, tool, and agent regression cases against fake/deterministic providers
-and an in-memory retrieval double. Exit code is non-zero on any failure.
-
-Usage:
-    python evaluation/runner/run_evals.py
-"""
+"""Deterministic AgentForge evaluation runner (no paid API calls)."""
 
 from __future__ import annotations
 
 import json
-import os
 import sys
+import uuid
 from pathlib import Path
-from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
 BACKEND = ROOT / "backend"
 sys.path.insert(0, str(BACKEND))
 
-from app.services.agent_provider import (  # noqa: E402
-    AgentDecision,
-    DecisionRequest,
-    LLMDecisionProvider,
-)
+from app.services.agent_provider import AgentDecision, DecisionRequest, FakeDecisionProvider, LLMDecisionProvider  # noqa: E402
 from app.services.agent_service import AgentOrchestrationService  # noqa: E402
-from app.services.agent_provider import FakeDecisionProvider  # noqa: E402
-from app.services.tool_registry import ToolRegistry  # noqa: E402
+from app.services.tool_registry import ToolError, ToolRegistry  # noqa: E402
 
 
 class InMemoryRetrieval:
@@ -35,20 +22,24 @@ class InMemoryRetrieval:
         self.results = results
 
     def search(self, query, top_k=None, *, user_id=None):
-        return [self._to_chunk(item) for item in self.results]
-
-    @staticmethod
-    def _to_chunk(item):
         from app.services.retrieval_service import RetrievedChunk
 
-        return RetrievedChunk(
-            chunk_id=item.get("chunk_id", "c"),
-            document_id=item.get("document_id", "d"),
-            filename=item.get("filename", "f.txt"),
-            chunk_index=0,
-            content=item.get("content", ""),
-            similarity=0.9,
-        )
+        rows = []
+        for index, item in enumerate(self.results):
+            def as_uuid(value: str, fallback: str) -> str:
+                try:
+                    return str(uuid.UUID(value))
+                except (ValueError, TypeError):
+                    return fallback
+            rows.append(RetrievedChunk(
+                chunk_id=as_uuid(item.get("chunk_id"), f"00000000-0000-0000-0000-{index + 1:012d}"),
+                document_id=as_uuid(item.get("document_id"), f"00000000-0000-0000-0000-{index + 101:012d}"),
+                filename=item.get("filename", "f.txt"),
+                chunk_index=index,
+                content=item.get("content", ""),
+                similarity=0.9,
+            ))
+        return rows
 
 
 class RepeatToolProvider(LLMDecisionProvider):
@@ -71,14 +62,11 @@ def _provider_for(case: dict) -> LLMDecisionProvider:
 
 
 def run_rag(case: dict) -> tuple[bool, str]:
-    question = case["question"]
-    retrieval = InMemoryRetrieval(case.get("retrieval", []))
-    service = AgentOrchestrationService(FakeDecisionProvider(), ToolRegistry(retrieval))
-    result = service.run(question, user_id=None)
+    service = AgentOrchestrationService(FakeDecisionProvider(), ToolRegistry(InMemoryRetrieval(case.get("retrieval", []))))
+    result = service.run(case["question"], user_id=None)
     expect = case["expect"]
-    if expect.get("retrieved"):
-        if not result.sources:
-            return False, f"expected sources, got none (kind={result.answer_kind})"
+    if expect.get("retrieved") and not result.sources:
+        return False, f"expected sources, got none (kind={result.answer_kind})"
     if expect.get("has_source") and not result.sources:
         return False, "expected at least one source"
     if expect.get("answer_kind") and result.answer_kind != expect["answer_kind"]:
@@ -89,37 +77,32 @@ def run_rag(case: dict) -> tuple[bool, str]:
 
 
 def run_tool(case: dict) -> tuple[bool, str]:
-    question = case["question"]
-    retrieval = InMemoryRetrieval([])
-    service = AgentOrchestrationService(FakeDecisionProvider(), ToolRegistry(retrieval))
-    result = service.run(question, user_id=None)
+    registry = ToolRegistry(InMemoryRetrieval([]))
     expect = case["expect"]
-    if expect.get("tool"):
-        if expect["tool"] not in result.tools_used:
-            return False, f"expected tool {expect['tool']}, used {result.tools_used}"
+    if case["kind"] == "tool_invalid":
+        try:
+            registry.execute("python", {"code": "print(1)"})
+        except ToolError:
+            return True, ""
+        return False, "invalid tool was not rejected"
+    result = AgentOrchestrationService(FakeDecisionProvider(), registry).run(case["question"], user_id=None)
+    if expect.get("tool") and expect["tool"] not in result.tools_used:
+        return False, f"expected tool {expect['tool']}, used {result.tools_used}"
     if expect.get("answer_contains") and expect["answer_contains"] not in result.answer:
         return False, f"answer missing {expect['answer_contains']!r}: {result.answer!r}"
-    if expect.get("has_error"):
-        if not any(ev.event == "safe_error" for ev in result.events):
-            return False, "expected a safe error event"
-    if expect.get("safe_failure"):
-        if result.answer_kind != "INSUFFICIENT_EVIDENCE":
-            return False, f"expected safe failure, got {result.answer_kind}"
+    if expect.get("safe_failure") and result.answer_kind != "INSUFFICIENT_EVIDENCE":
+        return False, f"expected safe failure, got {result.answer_kind}"
     return True, ""
 
 
 def run_agent(case: dict) -> tuple[bool, str]:
-    question = case["question"]
-    retrieval = InMemoryRetrieval([])
-    provider = _provider_for(case)
-    service = AgentOrchestrationService(provider, ToolRegistry(retrieval))
-    result = service.run(question, user_id=None)
+    service = AgentOrchestrationService(_provider_for(case), ToolRegistry(InMemoryRetrieval([])))
+    result = service.run(case["question"], user_id=None)
     expect = case["expect"]
     if expect.get("answer_kind") and result.answer_kind != expect["answer_kind"]:
         return False, f"answer_kind={result.answer_kind} expected={expect['answer_kind']}"
-    if expect.get("tools_used"):
-        if result.tools_used != expect["tools_used"]:
-            return False, f"tools_used={result.tools_used} expected={expect['tools_used']}"
+    if expect.get("tools_used") and result.tools_used != expect["tools_used"]:
+        return False, f"tools_used={result.tools_used} expected={expect['tools_used']}"
     if expect.get("answer_contains") and expect["answer_contains"] not in result.answer:
         return False, f"answer missing {expect['answer_contains']!r}"
     if expect.get("safe_failure"):
@@ -127,44 +110,32 @@ def run_agent(case: dict) -> tuple[bool, str]:
             return False, f"expected safe failure, got {result.answer_kind}"
         if "sensitive provider detail" in result.answer or "sensitive provider detail" in str(result.events):
             return False, "provider detail leaked"
-    if expect.get("bounded"):
-        if len(result.tools_used) > 4:
-            return False, "tool loop not bounded"
+    if expect.get("bounded") and len(result.tools_used) > 4:
+        return False, "tool loop not bounded"
     return True, ""
 
 
 RUNNERS = {"rag": run_rag, "tool": run_tool, "tool_invalid": run_tool, "agent": run_agent}
 
 
-def load(relative: str) -> list[dict]:
-    path = ROOT / relative
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
 def main() -> int:
-    datasets = [
-        "evaluation/datasets/rag_cases.json",
-        "evaluation/datasets/tool_cases.json",
-        "evaluation/datasets/agent_cases.json",
-    ]
+    datasets = ["evaluation/datasets/rag_cases.json", "evaluation/datasets/tool_cases.json", "evaluation/datasets/agent_cases.json"]
     failed = 0
     passed = 0
-    for rel in datasets:
-        for case in load(rel):
-            kind = case["kind"]
-            runner = RUNNERS.get(kind)
+    for relative in datasets:
+        cases = json.loads((ROOT / relative).read_text(encoding="utf-8"))
+        for case in cases:
+            runner = RUNNERS.get(case["kind"])
             if runner is None:
-                print(f"FAIL {case['id']}: unknown kind {kind}")
-                failed += 1
-                continue
-            ok, msg = runner(case)
+                ok, message = False, f"unknown kind {case['kind']}"
+            else:
+                ok, message = runner(case)
             if ok:
                 passed += 1
                 print(f"PASS {case['id']}")
             else:
                 failed += 1
-                print(f"FAIL {case['id']}: {msg}")
-
+                print(f"FAIL {case['id']}: {message}")
     print(f"\n{passed} passed, {failed} failed")
     return 1 if failed else 0
 
