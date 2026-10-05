@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 
 from fastapi.testclient import TestClient
@@ -17,22 +18,39 @@ def _register_login(email: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {resp.json()['access_token']}"}
 
 
+def _events(body: str) -> list[tuple[str, dict]]:
+    parsed = []
+    for frame in body.strip().split("\n\n"):
+        name = "message"
+        data = {}
+        for line in frame.splitlines():
+            if line.startswith("event:"):
+                name = line.split(":", 1)[1].strip()
+            elif line.startswith("data:"):
+                data = json.loads(line.split(":", 1)[1].strip())
+        if data:
+            parsed.append((name, data))
+    return parsed
+
+
 def test_stream_requires_auth() -> None:
     resp = client.post("/agent/chat/stream", json={"question": "7 * 8"})
     assert resp.status_code == 401
 
 
-def test_stream_returns_sse_events_for_calculator() -> None:
+def test_stream_returns_typed_sse_events_and_one_message_start() -> None:
     headers = _register_login(f"stream-{uuid.uuid4().hex}@example.com")
     resp = client.post("/agent/chat/stream", json={"question": "7 * 8"}, headers=headers)
     assert resp.status_code == 200
     assert "text/event-stream" in resp.headers.get("content-type", "")
-    assert "X-Request-Id" in resp.headers
-    body = resp.text
-    assert "event: message_start" in body
-    assert "event: tool_start" in body
-    assert "event: token" in body
-    assert "event: message_end" in body
+    events = _events(resp.text)
+    names = [name for name, _ in events]
+    assert names.count("message_start") == 1
+    assert names[0] == "message_start"
+    assert "tool_start" in names
+    assert "token" in names
+    assert "message_end" in names
+    assert events[0][1]["request_id"] == resp.headers["X-Request-Id"]
 
 
 def test_stream_does_not_leak_secrets_in_body() -> None:
