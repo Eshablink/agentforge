@@ -24,7 +24,12 @@ app.add_middleware(
 
 @app.middleware("http")
 async def request_id_middleware(request: Request, call_next):
+    # ONE canonical request ID per HTTP request: exposed both via the context
+    # variable (log correlation) and request.state (so streaming routes can
+    # reuse the exact same ID inside their body generator, where the context
+    # variable has already been reset after the middleware returns).
     request_id = new_request_id()
+    request.state.request_id = request_id
     token = set_request_id(request_id)
     started = time.perf_counter()
     status_code = 500
