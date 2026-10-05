@@ -1,0 +1,28 @@
+[
+  {
+    "id": "agent_calculator_answer",
+    "kind": "agent",
+    "question": "3 + 4",
+    "expect": {"answer_kind": "TOOL_DERIVED", "tools_used": ["calculator"], "answer_contains": "7"}
+  },
+  {
+    "id": "agent_insufficient_evidence",
+    "kind": "agent",
+    "question": "unanswerable question requiring evidence",
+    "expect": {"answer_kind": "INSUFFICIENT_EVIDENCE"}
+  },
+  {
+    "id": "agent_bounded_tool_loop",
+    "kind": "agent",
+    "question": "today",
+    "provider": "repeat_tool",
+    "expect": {"bounded": true, "answer_kind": "INSUFFICIENT_EVIDENCE"}
+  },
+  {
+    "id": "agent_provider_failure",
+    "kind": "agent",
+    "question": "anything",
+    "provider": "raising",
+    "expect": {"safe_failure": true, "answer_kind": "INSUFFICIENT_EVIDENCE"}
+  }
+]
