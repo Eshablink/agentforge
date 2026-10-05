@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api.router import api_router
 from app.core.settings import get_settings
+from app.core.telemetry import new_request_id, reset_request_id, set_request_id
 
 settings = get_settings()
 app = FastAPI(title=settings.app_name, version=settings.app_version)
@@ -17,4 +19,21 @@ app.add_middleware(
     allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    request_id = new_request_id()
+    token = set_request_id(request_id)
+    try:
+        response = await call_next(request)
+    except Exception as exc:  # pragma: no cover - safety net
+        response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
+        response.headers["X-Request-Id"] = request_id
+        raise exc
+    response.headers["X-Request-Id"] = request_id
+    reset_request_id(token)
+    return response
+
+
 app.include_router(api_router, prefix=settings.api_prefix)
