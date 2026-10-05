@@ -11,9 +11,14 @@ from app.services.tool_registry import MAX_AGENT_STEPS, MAX_TOOLS_PER_REQUEST, T
 class StreamAgentService(AgentOrchestrationService):
     """Bounded streaming view of the existing provider-independent agent loop.
 
-    Provider decisions are returned as validated structured decisions. Their
-    final text is emitted in bounded SSE chunks; tool execution remains typed,
-    allowlisted, and owner-scoped.
+    Provider decisions are returned as validated structured decisions; their
+    final text is emitted as bounded incremental SSE chunks. Tool execution
+    remains typed, allowlisted, and owner-scoped.
+
+    The route owns the request-level ``message_start`` event (it knows the
+    canonical request ID and conversation ID). This service emits only
+    operational events: tool_start / retrieval / tool_result / token /
+    message_end / error.
     """
 
     def stream(self, question: str, *, context: str = "", user_id=None) -> Iterator[tuple[str, dict]]:
@@ -33,7 +38,6 @@ class StreamAgentService(AgentOrchestrationService):
             for offset in range(0, len(bounded), 120):
                 yield "token", {"text": bounded[offset:offset + 120]}
 
-        yield "message_start", {}
         try:
             for step in range(min(self.settings.max_agent_steps, MAX_AGENT_STEPS)):
                 if time.monotonic() - started > self.settings.max_stream_duration_seconds:
