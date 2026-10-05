@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Deterministic AgentForge evaluation runner (no paid API calls)."""
+"""Deterministic AgentForge evaluation runner (no paid API calls).
+
+Runs RAG, tool, and agent regression cases against deterministic/fake providers
+and an in-memory retrieval double. Exit code is non-zero on any failure.
+
+This is a deterministic regression suite, not a generative model quality
+benchmark: it checks retrieval/source behavior, tool allowlisting/selection,
+invalid-tool rejection, bounded agent execution, and provider-failure safety.
+"""
 
 from __future__ import annotations
 
@@ -73,6 +81,8 @@ def run_rag(case: dict) -> tuple[bool, str]:
         return False, f"answer_kind={result.answer_kind} expected={expect['answer_kind']}"
     if expect.get("has_filename") and (not result.sources or not result.sources[0].filename):
         return False, "expected source filename"
+    if expect.get("answer_contains") and expect["answer_contains"] not in result.answer:
+        return False, f"answer missing grounding text {expect['answer_contains']!r}"
     return True, ""
 
 
