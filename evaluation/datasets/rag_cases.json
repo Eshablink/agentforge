@@ -2,9 +2,9 @@
   {
     "id": "rag_grounded_has_source",
     "kind": "rag",
-    "question": "What does the uploaded evidence say?",
-    "retrieval": [{"chunk_id": "c1", "content": "the capital of France is Paris"}],
-    "expect": {"retrieved": true, "has_source": true}
+    "question": "What does the uploaded evidence say about France?",
+    "retrieval": [{"chunk_id": "c1", "content": "the capital of France is Paris", "document_id": "d1", "filename": "france.txt"}],
+    "expect": {"retrieved": true, "has_source": true, "answer_contains": "the capital of France is Paris", "answer_kind": "RAG_GROUNDED"}
   },
   {
     "id": "rag_empty_is_insufficient",
@@ -16,8 +16,8 @@
   {
     "id": "rag_source_metadata_present",
     "kind": "rag",
-    "question": "Show provenance",
-    "retrieval": [{"chunk_id": "c2", "content": "evidence", "document_id": "d1", "filename": "doc.txt"}],
-    "expect": {"retrieved": true, "has_source": true, "has_filename": true}
+    "question": "Show provenance from the document",
+    "retrieval": [{"chunk_id": "c2", "content": "the test evidence says grounded result", "document_id": "d1", "filename": "doc.txt"}],
+    "expect": {"retrieved": true, "has_source": true, "has_filename": true, "answer_contains": "the test evidence says grounded result"}
   }
 ]
