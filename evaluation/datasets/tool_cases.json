@@ -1,0 +1,26 @@
+[
+  {
+    "id": "tool_calculator_selected",
+    "kind": "tool",
+    "question": "7 * 8",
+    "expect": {"tool": "calculator", "answer_contains": "56"}
+  },
+  {
+    "id": "tool_date_selected",
+    "kind": "tool",
+    "question": "what is today's date",
+    "expect": {"tool": "date_offset"}
+  },
+  {
+    "id": "tool_unknown_rejected",
+    "kind": "tool_invalid",
+    "question": "run arbitrary python",
+    "expect": {"tool": null, "has_error": true}
+  },
+  {
+    "id": "tool_divide_by_zero_safe",
+    "kind": "tool",
+    "question": "8 / 0",
+    "expect": {"safe_failure": true}
+  }
+]
