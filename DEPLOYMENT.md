@@ -2,59 +2,86 @@
 
 ## Current state
 
-AgentForge is production-ready at the application and deployment-definition level, but **no cloud production rollout is claimed by this repository**. The repository contains a Render Blueprint and local Deployment Validation so the operator can perform the rollout with real credentials.
+AgentForge is production-ready at the application and deployment-definition level, but **no cloud production rollout is claimed by this repository**. The repository defines a low-cost deployment pattern using Render for the app services, Supabase Postgres + pgvector for durable data, and a TLS Redis-compatible service such as Upstash for shared rate limiting.
 
-## Recommended first deployment: Render
+## Recommended portfolio deployment
 
-Render Blueprints can define interconnected services and Postgres in a single render.yaml. The repository's blueprint creates:
+Use the same two Render application services already defined in `render.yaml`:
 
-- agentforge-api: Dockerized FastAPI service.
-- agentforge-web: React static site.
-- agentforge-db: PostgreSQL 16 database with pgvector available as a supported extension.
+- `agentforge-api`: Dockerized FastAPI service.
+- `agentforge-web`: React static site.
 
-The backend runs Alembic in pre-deploy before serving traffic. Both services use checksPass deploy behavior so the connected deployment can be gated by CI.
+Keep durable Postgres outside the Render Blueprint:
 
-### Required secrets
+- **Supabase Postgres + pgvector** for documents, embeddings, accounts and conversations.
+- Use the **Supabase Session Pooler** connection string for a hosted backend. The application accepts the standard `postgresql://` URL and normalizes it to SQLAlchemy's `postgresql+psycopg://` form.
+- Keep `sslmode=require` in the production connection string.
 
-Add these in the agentforge-api service before the first production deploy:
+Keep shared Redis outside the Render Blueprint:
 
+- **Upstash Redis over TLS** is a compatible choice for `RATE_LIMIT_BACKEND=redis`.
+- Set `REDIS_URL` to the TCP/TLS URL beginning with `rediss://`; AgentForge intentionally rejects non-TLS shared Redis in production.
+
+The repository does not vendor or provision either external service. That keeps credentials out of Git and avoids coupling the application schema to one cloud vendor.
+
+## Required production secrets
+
+Add these in the `agentforge-api` service before the first production deploy:
+
+    DATABASE_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres?sslmode=require
     OPENAI_API_KEY=<real provider credential>
-    REDIS_URL=rediss://<tls-redis-endpoint>
+    REDIS_URL=rediss://default:<password>@<upstash-host>:6379
 
-Do not commit these values. REDIS_URL must use TLS because production settings reject non-TLS shared Redis.
+Do not commit these values.
 
-### First rollout
+Use the Supabase **Session Pooler** endpoint for the database rather than the transaction pooler. The application uses normal SQLAlchemy sessions and Alembic migrations, which are a better fit for session semantics.
 
-1. Connect Eshablink/agentforge to a Render project and select the Blueprint.
-2. Let Render create the API, static site and Postgres resources.
-3. Add the real provider credential and TLS Redis endpoint.
-4. Confirm the generated DATABASE_URL and CORS_ORIGINS wiring.
-5. Verify the pre-deploy migration completes before the API receives traffic.
-6. Check API /health and /ready.
-7. Open the frontend and test registration/login.
-8. Upload a small non-sensitive document and verify indexed retrieval.
-9. Run a tool-assisted prompt and a streaming prompt.
-10. Review application logs and request-ID metadata, then add a custom domain only after the generated deployment is stable.
+## First rollout
 
-### Custom domains
+1. Create a Supabase project and ensure the `vector` extension is available.
+2. In Supabase **Connect**, copy the Session Pooler connection string and replace the password. Keep `sslmode=require`.
+3. Create a TLS Redis database and copy its `rediss://` TCP connection URL.
+4. Connect `Eshablink/agentforge` to Render and create the Blueprint from `render.yaml`.
+5. Add `DATABASE_URL`, `OPENAI_API_KEY` and `REDIS_URL` to `agentforge-api`.
+6. Let Render run `alembic -c alembic.ini upgrade head` in the pre-deploy step before traffic.
+7. Verify `/health` and `/ready`.
+8. Open the frontend and test registration/login.
+9. Upload a small non-sensitive document and verify indexed retrieval.
+10. Run a tool-assisted prompt and a streaming prompt.
+11. Review logs and request-ID metadata, then add a custom domain only after the generated deployment is stable.
 
-The Blueprint automatically wires the platform-generated frontend URL into backend CORS and the backend URL into the frontend build. For a custom frontend domain, update CORS_ORIGINS to the exact HTTPS origin before opening the application through that domain.
+## Render service notes
 
-Review the edge example in deploy/nginx.edge.example.conf if placing another reverse proxy in front of the application. Never configure wildcard forwarded proxy trust in production.
+The blueprint uses the free web-service tier to minimize recurring platform cost. Free service instances may sleep when idle, so the first request after inactivity can be slower. For a continuously warm portfolio demo, move only the API service to an appropriate paid tier later; no application architecture change is required.
+
+The static frontend remains a Render static site and therefore does not consume a continuously running server process.
+
+## Managed database notes
+
+Supabase supports PostgreSQL extensions including pgvector. The current migrations enable `vector` and create the cosine-oriented vector index expected by AgentForge.
+
+For hosted IPv4-only environments, prefer Supabase's shared Session Pooler endpoint. Avoid the transaction pooler for this application because ordinary SQLAlchemy/Alembic session behavior is a better fit for session-mode connections.
+
+## Custom domains
+
+The Blueprint automatically wires the platform-generated frontend URL into backend CORS and the backend URL into the frontend build. For a custom frontend domain, update `CORS_ORIGINS` to the exact HTTPS origin before opening the application through that domain.
+
+Review the edge example in `deploy/nginx.edge.example.conf` if placing another reverse proxy in front of the application. Never configure wildcard forwarded proxy trust in production.
 
 ## Local production-like validation
 
-The GitHub Deployment Validation workflow proves the artifact boundary without making paid model calls. It provisions PostgreSQL+pgvector and TLS Redis, builds the production images, runs the migration once, verifies production provider rejection rules, starts the backend/frontend, checks readiness failure and recovery and runs smoke probes.
+The GitHub Deployment Validation workflow proves the artifact boundary without making paid model calls. It provisions PostgreSQL+pgvector and TLS Redis locally, builds the production images, runs the migration once, verifies production provider rejection rules, starts the backend/frontend, checks readiness failure and recovery and runs smoke probes.
 
 The standard AgentForge CI additionally runs the complete pytest suite and frontend production build.
 
 ## Rollback
 
-Application rollback should use the hosting platform's previous successful release. Database rollback is not automatic: review migrations and recovery procedures before schema changes. Keep a current database backup for paid production databases.
+Application rollback should use the hosting platform's previous successful release. Database rollback is not automatic: review migrations and recovery procedures before schema changes. Keep a current database backup for paid production databases and understand the provider's free-tier pause/retention limits before using free tiers for anything important.
 
 ## Security checklist
 
 - Real production provider credential stored only in the platform secret manager.
+- `DATABASE_URL` uses the managed provider's TLS connection settings.
 - TLS Redis endpoint configured.
 - Exact HTTPS CORS origin.
 - Direct API access restricted when an edge proxy is used.

@@ -22,10 +22,16 @@ The UI is treated as a product boundary: loading, streaming, cancellation, evide
 
 ## ADR-027 — Render Blueprint as a deployment target
 
-Render was selected as the first infrastructure-as-code target because its Blueprint format can define the web service, static site and Postgres resources together, supports pre-deploy commands for migrations and can gate auto-deploys on passing checks.
+Render remains the application hosting target because its Blueprint format can define the API and static frontend together, supports pre-deploy commands for migrations and can gate auto-deploys on passing checks.
 
-The blueprint does not store provider credentials. Production application settings continue to require a real OpenAI-compatible key and a TLS Redis endpoint. This preserves the application's fail-closed security contract rather than weakening it for a particular platform.
+The Blueprint no longer provisions Postgres. Durable data is kept in an external managed PostgreSQL service such as Supabase, while shared rate limiting is kept in an external TLS Redis service such as Upstash. This separates application deployment from durable infrastructure without changing the application schema.
 
 ## ADR-028 — Platform-provided HTTP port
 
 The backend entrypoint reads PORT from the runtime environment with an 8000 default for local development. This keeps local behavior stable while allowing hosted platforms to choose their service port without changing the image.
+
+## ADR-029 — Normalize hosted PostgreSQL connection URLs
+
+Managed PostgreSQL providers commonly return `postgres://` or `postgresql://` URLs, while AgentForge's SQLAlchemy engine explicitly uses the psycopg driver. Normalize these standard URL forms at the settings boundary to `postgresql+psycopg://`. Provider-specific connection handling stays outside the core database layer.
+
+The deployment runbook recommends a managed provider's TLS connection settings and the Supabase Session Pooler for hosted session-oriented SQLAlchemy/Alembic workloads.

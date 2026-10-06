@@ -73,6 +73,21 @@ class Settings(BaseSettings):
             raise ValueError("APP_ENV must be development, test or production")
         return value.lower()
 
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: str) -> str:
+        """
+        Accept standard PostgreSQL URLs from hosted providers.
+
+        SQLAlchemy needs the psycopg driver explicitly, while managed Postgres
+        providers commonly expose URLs as postgres:// or postgresql://.
+        """
+        normalized = str(value).strip()
+        for prefix in ("postgres://", "postgresql://"):
+            if normalized.startswith(prefix):
+                return "postgresql+psycopg://" + normalized.split("://", 1)[1]
+        return normalized
+
     @field_validator("embedding_provider", "llm_provider")
     @classmethod
     def validate_provider(cls, value: str) -> str:

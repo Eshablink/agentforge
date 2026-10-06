@@ -29,6 +29,17 @@ def test_settings_content_types_parsing() -> None:
     assert settings.supported_content_type_list == ["text/plain", "application/pdf"]
 
 
+def test_settings_normalize_managed_postgres_urls() -> None:
+    for source_url in (
+        "postgres://service:secret@managed.example:5432/agentforge",
+        "postgresql://service:secret@managed.example:5432/agentforge?sslmode=require",
+    ):
+        settings = _production(database_url=source_url)
+        assert settings.database_url.startswith("postgresql+psycopg://")
+        assert "managed.example:5432/agentforge" in settings.database_url
+        assert "sslmode=require" in settings.database_url or "?" not in settings.database_url
+
+
 def test_production_requires_explicit_cors_origins_and_selected_provider_credentials() -> None:
     with pytest.raises(ValidationError):
         _production(cors_origins="*")

@@ -9,6 +9,7 @@ on:
       - main
       - feat/agentforge-phases-9-11
       - feat/phase-12-production-experience
+      - feat/low-cost-cloud-deployment
 
 permissions:
   contents: read
@@ -43,11 +44,7 @@ jobs:
       - name: Build PostgreSQL + Redis validation network
         run: |
           docker network create agentforge-validation
-          docker run -d --name agentforge-postgres --network agentforge-validation \
-            -e POSTGRES_DB=$POSTGRES_DB \
-            -e POSTGRES_USER=$POSTGRES_USER \
-            -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
-            pgvector/pgvector:pg16
+          docker run -d --name agentforge-postgres --network agentforge-validation             -e POSTGRES_DB=$POSTGRES_DB             -e POSTGRES_USER=$POSTGRES_USER             -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD             pgvector/pgvector:pg16
           for i in $(seq 1 30); do
             if docker exec agentforge-postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB; then exit 0; fi
             sleep 2
@@ -57,29 +54,16 @@ jobs:
       - name: Generate Redis TLS material
         run: |
           mkdir -p .ci/redis
-          openssl req -x509 -newkey rsa:2048 -nodes \
-            -keyout .ci/redis/ca.key -out .ci/redis/ca.crt \
-            -subj "/CN=AgentForge CI Redis CA" -days 1
-          openssl req -newkey rsa:2048 -nodes \
-            -keyout .ci/redis/server.key -out .ci/redis/server.csr \
-            -subj "/CN=agentforge-redis"
-          printf "subjectAltName=DNS:agentforge-redis\n" > .ci/redis/server.ext
-          openssl x509 -req -in .ci/redis/server.csr \
-            -CA .ci/redis/ca.crt -CAkey .ci/redis/ca.key -CAcreateserial \
-            -out .ci/redis/server.crt -days 1 -sha256 -extfile .ci/redis/server.ext
+          openssl req -x509 -newkey rsa:2048 -nodes             -keyout .ci/redis/ca.key -out .ci/redis/ca.crt             -subj "/CN=AgentForge CI Redis CA" -days 1
+          openssl req -newkey rsa:2048 -nodes             -keyout .ci/redis/server.key -out .ci/redis/server.csr             -subj "/CN=agentforge-redis"
+          printf "subjectAltName=DNS:agentforge-redis
+" > .ci/redis/server.ext
+          openssl x509 -req -in .ci/redis/server.csr             -CA .ci/redis/ca.crt -CAkey .ci/redis/ca.key -CAcreateserial             -out .ci/redis/server.crt -days 1 -sha256 -extfile .ci/redis/server.ext
           chmod 644 .ci/redis/ca.crt .ci/redis/server.crt .ci/redis/server.key
 
       - name: Start Redis over TLS
         run: |
-          docker run -d --name agentforge-redis --network agentforge-validation \
-            -v $PWD/.ci/redis:/tls:ro \
-            redis:7-alpine redis-server \
-            --port 0 \
-            --tls-port 6380 \
-            --tls-cert-file /tls/server.crt \
-            --tls-key-file /tls/server.key \
-            --tls-ca-cert-file /tls/ca.crt \
-            --tls-auth-clients no
+          docker run -d --name agentforge-redis --network agentforge-validation             -v $PWD/.ci/redis:/tls:ro             redis:7-alpine redis-server             --port 0             --tls-port 6380             --tls-cert-file /tls/server.crt             --tls-key-file /tls/server.key             --tls-ca-cert-file /tls/ca.crt             --tls-auth-clients no
           for i in $(seq 1 30); do
             if docker exec agentforge-redis redis-cli --tls --cacert /tls/ca.crt -h agentforge-redis -p 6380 ping | grep -q PONG; then exit 0; fi
             sleep 2
@@ -95,8 +79,20 @@ jobs:
       - name: Verify frontend lockfile
         run: test -s frontend/package-lock.json
 
-      - name: Validate Render Blueprint YAML
-        run: ruby -e 'require "yaml"; YAML.load_file("render.yaml"); puts "render.yaml YAML syntax OK"'
+      - name: Validate Render Blueprint contract
+        run: |
+          ruby - <<'RUBY'
+          require "yaml"
+          data = YAML.load_file("render.yaml")
+          services = data.fetch("services")
+          api = services.find { |service| service["name"] == "agentforge-api" }
+          raise "agentforge-api service missing" unless api
+          database = api.fetch("envVars").find { |env| env["key"] == "DATABASE_URL" }
+          raise "DATABASE_URL must be operator-supplied" unless database && database["sync"] == false
+          raise "Render Blueprint must not provision Postgres" if data.key?("databases")
+          raise "API must use free plan for the low-cost deployment path" unless api["plan"] == "free"
+          puts "render.yaml deployment contract OK"
+          RUBY
 
       - name: Verify non-root images
         run: |
@@ -106,19 +102,7 @@ jobs:
       - name: Verify production rejects fake LLM provider
         run: |
           set +e
-          docker run --rm --network agentforge-validation \
-            -e APP_ENV=production \
-            -e DATABASE_URL=$DATABASE_URL \
-            -e CORS_ORIGINS=$CORS_ORIGINS \
-            -e LLM_PROVIDER=fake \
-            -e EMBEDDING_PROVIDER=openai \
-            -e OPENAI_API_KEY=$OPENAI_API_KEY \
-            -e RATE_LIMIT_BACKEND=redis \
-            -e REDIS_URL=$REDIS_URL \
-            -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT \
-            -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro \
-            agentforge-backend:validation \
-            python -c "from app.core.settings import Settings; Settings()"
+          docker run --rm --network agentforge-validation             -e APP_ENV=production             -e DATABASE_URL=$DATABASE_URL             -e CORS_ORIGINS=$CORS_ORIGINS             -e LLM_PROVIDER=fake             -e EMBEDDING_PROVIDER=openai             -e OPENAI_API_KEY=$OPENAI_API_KEY             -e RATE_LIMIT_BACKEND=redis             -e REDIS_URL=$REDIS_URL             -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT             -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro             agentforge-backend:validation             python -c "from app.core.settings import Settings; Settings()"
           status=$?
           set -e
           test $status -ne 0
@@ -126,57 +110,22 @@ jobs:
       - name: Verify production rejects fake embedding provider
         run: |
           set +e
-          docker run --rm --network agentforge-validation \
-            -e APP_ENV=production \
-            -e DATABASE_URL=$DATABASE_URL \
-            -e CORS_ORIGINS=$CORS_ORIGINS \
-            -e LLM_PROVIDER=openai \
-            -e EMBEDDING_PROVIDER=fake \
-            -e OPENAI_API_KEY=$OPENAI_API_KEY \
-            -e RATE_LIMIT_BACKEND=redis \
-            -e REDIS_URL=$REDIS_URL \
-            -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT \
-            -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro \
-            agentforge-backend:validation \
-            python -c "from app.core.settings import Settings; Settings()"
+          docker run --rm --network agentforge-validation             -e APP_ENV=production             -e DATABASE_URL=$DATABASE_URL             -e CORS_ORIGINS=$CORS_ORIGINS             -e LLM_PROVIDER=openai             -e EMBEDDING_PROVIDER=fake             -e OPENAI_API_KEY=$OPENAI_API_KEY             -e RATE_LIMIT_BACKEND=redis             -e REDIS_URL=$REDIS_URL             -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT             -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro             agentforge-backend:validation             python -c "from app.core.settings import Settings; Settings()"
           status=$?
           set -e
           test $status -ne 0
 
+      - name: Verify hosted PostgreSQL URL normalization
+        run: |
+          docker run --rm             -e APP_ENV=production             -e DATABASE_URL='postgresql://service:ci-secret@managed.example:5432/agentforge?sslmode=require'             -e CORS_ORIGINS=$CORS_ORIGINS             -e LLM_PROVIDER=openai             -e EMBEDDING_PROVIDER=openai             -e OPENAI_API_KEY=$OPENAI_API_KEY             -e RATE_LIMIT_BACKEND=redis             -e REDIS_URL=$REDIS_URL             -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT             -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro             agentforge-backend:validation             python -c "from app.core.settings import Settings; assert Settings().database_url.startswith('postgresql+psycopg://')"
+
       - name: Run one-shot production migration
         run: |
-          docker run --rm --network agentforge-validation \
-            -e APP_ENV=$APP_ENV \
-            -e DATABASE_URL=$DATABASE_URL \
-            -e CORS_ORIGINS=$CORS_ORIGINS \
-            -e LLM_PROVIDER=$LLM_PROVIDER \
-            -e EMBEDDING_PROVIDER=$EMBEDDING_PROVIDER \
-            -e OPENAI_API_KEY=$OPENAI_API_KEY \
-            -e RATE_LIMIT_BACKEND=$RATE_LIMIT_BACKEND \
-            -e REDIS_URL=$REDIS_URL \
-            -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT \
-            -e FORWARDED_ALLOW_IPS=$FORWARDED_ALLOW_IPS \
-            -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro \
-            agentforge-backend:validation \
-            alembic -c alembic.ini upgrade head
+          docker run --rm --network agentforge-validation             -e APP_ENV=$APP_ENV             -e DATABASE_URL=$DATABASE_URL             -e CORS_ORIGINS=$CORS_ORIGINS             -e LLM_PROVIDER=$LLM_PROVIDER             -e EMBEDDING_PROVIDER=$EMBEDDING_PROVIDER             -e OPENAI_API_KEY=$OPENAI_API_KEY             -e RATE_LIMIT_BACKEND=$RATE_LIMIT_BACKEND             -e REDIS_URL=$REDIS_URL             -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT             -e FORWARDED_ALLOW_IPS=$FORWARDED_ALLOW_IPS             -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro             agentforge-backend:validation             alembic -c alembic.ini upgrade head
 
       - name: Start production backend
         run: |
-          docker run -d --name agentforge-backend-validation \
-            --network agentforge-validation \
-            -p 8000:8000 \
-            -e APP_ENV=$APP_ENV \
-            -e DATABASE_URL=$DATABASE_URL \
-            -e CORS_ORIGINS=$CORS_ORIGINS \
-            -e LLM_PROVIDER=$LLM_PROVIDER \
-            -e EMBEDDING_PROVIDER=$EMBEDDING_PROVIDER \
-            -e OPENAI_API_KEY=$OPENAI_API_KEY \
-            -e RATE_LIMIT_BACKEND=$RATE_LIMIT_BACKEND \
-            -e REDIS_URL=$REDIS_URL \
-            -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT \
-            -e FORWARDED_ALLOW_IPS=$FORWARDED_ALLOW_IPS \
-            -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro \
-            agentforge-backend:validation
+          docker run -d --name agentforge-backend-validation             --network agentforge-validation             -p 8000:8000             -e APP_ENV=$APP_ENV             -e DATABASE_URL=$DATABASE_URL             -e CORS_ORIGINS=$CORS_ORIGINS             -e LLM_PROVIDER=$LLM_PROVIDER             -e EMBEDDING_PROVIDER=$EMBEDDING_PROVIDER             -e OPENAI_API_KEY=$OPENAI_API_KEY             -e RATE_LIMIT_BACKEND=$RATE_LIMIT_BACKEND             -e REDIS_URL=$REDIS_URL             -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT             -e FORWARDED_ALLOW_IPS=$FORWARDED_ALLOW_IPS             agentforge-backend:validation
 
       - name: Start production frontend
         run: docker run -d --name agentforge-frontend-validation -p 8080:8080 agentforge-frontend:validation
@@ -236,15 +185,8 @@ jobs:
       - name: Validate Nginx syntax
         run: |
           mkdir -p .ci/nginx
-          openssl req -x509 -newkey rsa:2048 -nodes \
-            -keyout .ci/nginx/privkey.pem -out .ci/nginx/fullchain.pem \
-            -subj "/CN=app.example.invalid" -days 1
-          docker run --rm \
-            --add-host backend:127.0.0.1 \
-            --add-host frontend:127.0.0.1 \
-            -v $PWD/deploy/nginx.edge.example.conf:/etc/nginx/conf.d/default.conf:ro \
-            -v $PWD/.ci/nginx:/etc/tls:ro \
-            nginx:1.27-alpine nginx -t
+          openssl req -x509 -newkey rsa:2048 -nodes             -keyout .ci/nginx/privkey.pem -out .ci/nginx/fullchain.pem             -subj "/CN=app.example.invalid" -days 1
+          docker run --rm             --add-host backend:127.0.0.1             --add-host frontend:127.0.0.1             -v $PWD/deploy/nginx.edge.example.conf:/etc/nginx/conf.d/default.conf:ro             -v $PWD/.ci/nginx:/etc/tls:ro             nginx:1.27-alpine nginx -t
 
       - name: Show logs on failure
         if: failure()
