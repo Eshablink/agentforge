@@ -1,0 +1,7 @@
+# Phase 9: native final-answer streaming
+
+Phase 8 is complete and merged on main. Phase 9 adds OpenAI-compatible native chat-completion deltas **only for final-answer text**. The validated, typed agent decision still chooses tools first; tool execution and owner-filtered retrieval remain unchanged. Provider payloads are never exposed. Fake providers simulate bounded deltas offline; custom providers without a native adapter use the existing completed-answer SSE fallback. The final `message_end.stream_mode` is `native`, `fallback` or `simulated`.
+
+Only stream creation may use bounded pre-consumption retries. Once a provider stream has yielded output, it is never restarted; malformed frames, provider errors and output/time limits produce a single controlled error terminal event. Incomplete/cancelled streams are not persisted as successful exchanges. The route owns exactly one `message_start`; the service emits operational events only. Frontend ignores updates after cancellation and refreshes conversations only after a completed terminal event. Telemetry records counts, mode, first-token latency, duration and error categories but no text.
+
+Limitations: tool decisions themselves are not streamed; first output waits for structured decision. The fake simulates rather than invokes an external model. Native streaming still requires a live provider that supports the OpenAI-compatible streaming API; CI uses offline fakes and mocked provider frames. Preserve Phase 8's TLS proxy, Redis and PostgreSQL controls.
