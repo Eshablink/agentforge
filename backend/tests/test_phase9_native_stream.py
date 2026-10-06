@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
-import pytest
 from types import SimpleNamespace
 
-from app.services.agent_provider import AgentDecision, DecisionRequest, FakeDecisionProvider, LLMDecisionProvider
+import pytest
+
+from app.services.agent_provider import AgentDecision, DecisionRequest, FakeDecisionProvider, LLMDecisionProvider, OpenAIDecisionProvider
+from app.services.native_stream import NativeStreamFailure, native_deltas
 from app.services.stream_agent_service import StreamAgentService
-from app.services.native_stream import native_deltas, NativeStreamFailure
 from app.services.tool_registry import ToolRegistry
 
 
@@ -39,9 +40,10 @@ def test_fake_deltas_are_simulated_and_terminal_once():
 
 
 def test_fallback_is_explicit_for_non_native_provider():
-    frames = list(_service(DirectProvider()).stream("anything"))
-    assert frames == [("token", {"text": "fallback answer"}),
-                      ("message_end", {"answer_kind": "DIRECT", "tools_used": [], "sources": [], "stream_mode": "fallback"})]
+    assert list(_service(DirectProvider()).stream("anything")) == [
+        ("token", {"text": "fallback answer"}),
+        ("message_end", {"answer_kind": "DIRECT", "tools_used": [], "sources": [], "stream_mode": "fallback"}),
+    ]
 
 
 def test_failure_one_terminal_and_no_secret():
@@ -51,8 +53,7 @@ def test_failure_one_terminal_and_no_secret():
     assert "private provider detail" not in json.dumps(frames)
 
 
-def test_native_delta_adapter_order_and_closes(monkeypatch):
-    from app.services.agent_provider import OpenAIDecisionProvider
+def test_native_delta_adapter_order_and_closes():
     class Frames:
         closed = False
         def __iter__(self):
@@ -69,8 +70,7 @@ def test_native_delta_adapter_order_and_closes(monkeypatch):
     assert frames.closed
 
 
-def test_native_failure_after_first_delta_never_retries(monkeypatch):
-    from app.services.agent_provider import OpenAIDecisionProvider
+def test_native_failure_after_first_delta_never_retries():
     calls = []
     def create(**kw):
         calls.append(1)
@@ -82,5 +82,8 @@ def test_native_failure_after_first_delta_never_retries(monkeypatch):
     provider.model = "offline-test"
     provider.settings = SimpleNamespace(llm_timeout_seconds=5, llm_max_retries=2)
     provider.client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
-    frames = list(_service(provider).stream("anything")) if False else list(native_deltas(provider, DecisionRequest(question="test", step=0)))
-    assert frames == ["start"]
+    stream = native_deltas(provider, DecisionRequest(question="test", step=0))
+    assert next(stream) == "start"
+    with pytest.raises(NativeStreamFailure):
+        next(stream)
+    assert len(calls) == 1
