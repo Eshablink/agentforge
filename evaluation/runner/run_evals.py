@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deterministic offline RAG, tool, agent and streaming regression runner."""
+"""Deterministic offline RAG, owner scope, tool, agent and stream regressions."""
 from __future__ import annotations
 
 import json
@@ -8,10 +8,10 @@ import uuid
 from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "backend"))
-from app.services.agent_provider import AgentDecision, DecisionRequest, FakeDecisionProvider, LLMDecisionProvider
+from app.services.agent_provider import AgentDecision, FakeDecisionProvider, LLMDecisionProvider
 from app.services.agent_service import AgentOrchestrationService
 from app.services.tool_registry import ToolError, ToolRegistry
-from quality import report_metrics, run_ranking, run_stream
+from quality import report_metrics, run_owner_scope, run_ranking, run_stream
 
 
 class InMemoryRetrieval:
@@ -97,11 +97,11 @@ def run_agent(case):
     return True, ""
 
 
-RUNNERS = {"rag": run_rag, "ranking": run_ranking, "tool": run_tool, "tool_invalid": run_tool, "agent": run_agent, "stream": run_stream}
+RUNNERS = {"rag": run_rag, "ranking": run_ranking, "owner_scope": run_owner_scope, "tool": run_tool, "tool_invalid": run_tool, "agent": run_agent, "stream": run_stream}
 
 
 def main():
-    datasets = ["rag_cases.json", "tool_cases.json", "agent_cases.json", "stream_cases.json"]
+    datasets = ["rag_cases.json", "tool_cases.json", "agent_cases.json", "stream_cases.json", "ownership_cases.json"]
     successes = []
     for name in datasets:
         for case in json.loads((ROOT / "evaluation" / "datasets" / name).read_text(encoding="utf-8")):
@@ -109,8 +109,7 @@ def main():
             ok, message = runner(case) if runner else (False, "unknown evaluation kind")
             successes.append((case["kind"], ok))
             print(f"{'PASS' if ok else 'FAIL'} {case['id']}" + (f": {message}" if not ok else ""))
-    metrics = report_metrics(successes)
-    for name, value in sorted(metrics.items()):
+    for name, value in sorted(report_metrics(successes).items()):
         print(f"METRIC {name}={value:.3f}")
     passed = sum(ok for _, ok in successes)
     failed = len(successes) - passed
