@@ -88,6 +88,7 @@ Raw provider frames and hidden reasoning are never exposed through the UI.
 | 11 | Complete | Advanced bounded RAG quality and offline evaluation |
 | 12 | Complete | Product UI/UX overhaul and initial cloud deployment definition |
 | 13 | Complete | Low-cost managed Postgres/Redis deployment path |
+| 14 | Complete | CodeQL, Dependabot and repository security policy |
 
 Phases 0–13 are implemented on the current branch; merge only after the new deployment checks are green. **A real cloud rollout still requires the owner's cloud accounts and production provider credentials.**
 
@@ -146,7 +147,7 @@ The repository uses a **low-cost managed deployment path**:
 
 The Render Blueprint intentionally does **not** provision a second Postgres database. This avoids tying durable application data to the application host and makes the database easy to replace later without changing the application architecture.
 
-See [docs/PHASE13.md](docs/PHASE13.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
+See [docs/PHASE13.md](docs/PHASE13.md), [docs/PHASE14.md](docs/PHASE14.md), [DEPLOYMENT.md](DEPLOYMENT.md), and [SECURITY.md](SECURITY.md).
 
 ## Quality and safety boundaries
 
