@@ -38,4 +38,4 @@ The deployment runbook recommends a managed provider's TLS connection settings a
 
 ## ADR-030 — Repository-level supply-chain controls
 
-Keep application security and delivery security as separate layers. Phase 14 adds CodeQL for Python and TypeScript/JavaScript, dependency review for pull requests and Dependabot for Python, npm and GitHub Actions updates. The controls use GitHub-native tooling and do not require application code changes or production credentials.
+Keep application security and delivery security as separate layers. Phase 14 adds CodeQL for Python and TypeScript/JavaScript and Dependabot for Python, npm and GitHub Actions updates. Dependency review is documented for enablement after the repository dependency graph is available. The controls use GitHub-native tooling and do not require application code changes or production credentials.
