@@ -63,10 +63,16 @@ return n"""
         self.namespace = namespace
 
     def check(self, key: str) -> None:
-        # Keys are server-derived opaque IDs/hashes; never include credentials.
         bucket = int(time.time()) // self.window_seconds
         try:
-            count = int(self.client.eval(self._SCRIPT, 1, f"agentforge:{self.namespace}:{key}:{bucket}", self.window_seconds * 2))
+            count = int(
+                self.client.eval(
+                    self._SCRIPT,
+                    1,
+                    f"agentforge:{self.namespace}:{key}:{bucket}",
+                    self.window_seconds * 2,
+                )
+            )
         except Exception as exc:
             raise RateLimitUnavailable("Rate limiter unavailable") from exc
         if count > self.limit:
@@ -78,13 +84,30 @@ def build_limiters(settings=None, redis_client=None) -> tuple[Limiter, Limiter]:
     if settings.rate_limit_backend == "memory":
         if settings.app_env == "production":
             raise ValueError("Production requires shared rate limiting")
-        return (SlidingWindowLimiter(settings.ai_requests_per_minute, 60),
-                SlidingWindowLimiter(settings.auth_attempts_per_minute, 60))
+        return (
+            SlidingWindowLimiter(settings.ai_requests_per_minute, 60),
+            SlidingWindowLimiter(settings.auth_attempts_per_minute, 60),
+        )
     if redis_client is None:
         from redis import Redis
-        redis_client = Redis.from_url(settings.redis_url, socket_timeout=2, socket_connect_timeout=2, decode_responses=True)
-    return (RedisLimiter(redis_client, settings.ai_requests_per_minute, 60, "ai"),
-            RedisLimiter(redis_client, settings.auth_attempts_per_minute, 60, "auth"))
+
+        redis_kwargs = {
+            "socket_timeout": 2,
+            "socket_connect_timeout": 2,
+            "decode_responses": True,
+        }
+        if settings.redis_ssl_ca_cert:
+            redis_kwargs.update(
+                {
+                    "ssl_ca_certs": settings.redis_ssl_ca_cert,
+                    "ssl_cert_reqs": "required",
+                }
+            )
+        redis_client = Redis.from_url(settings.redis_url, **redis_kwargs)
+    return (
+        RedisLimiter(redis_client, settings.ai_requests_per_minute, 60, "ai"),
+        RedisLimiter(redis_client, settings.auth_attempts_per_minute, 60, "auth"),
+    )
 
 
 ai_request_limiter, auth_request_limiter = build_limiters()

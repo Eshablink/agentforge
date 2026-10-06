@@ -1,9 +1,11 @@
-# AgentForge Project Brief
+# AgentForge project brief
 
-AgentForge is an authenticated full-stack document-RAG and registered-tool agent. Phases 0–7 are **complete on main**. Phase 7 PR #9 was **merged** at `63d7d3f0d417d06b2e57fa63874824de4306450d`, and main CI run 37320957004 passed. Its SSE transport provides bounded incremental chunks of completed generated text, not provider-native token streaming. Its deterministic RAG/tool/agent suite is not a general model-quality benchmark.
+AgentForge is an authenticated full-stack document-RAG and registered-tool agent. Phases 0–8 are **complete and merged** into main at `97934d7dd7f016a4d13f17b2afd4e577024d85a1`. Phases 9, 10 and 11 are **implemented and CI-verifiable on the existing draft PR #11**, not yet merged or deployed.
 
-Phase 8, on `feat/agentforge-phase-8`, provides production deployment and operational hardening: production-only explicit config, managed PostgreSQL + pgvector, one-shot Alembic migration, cheap liveness and dependency readiness, shared Redis fixed-window rate limiting with fail-closed behavior, auth attempt throttling, bounded ingestion and session cleanup, correct browser API origin, and vendor-neutral deployment guidance. This repository does not claim a live deployment.
+| Phase | Implemented capability | What verification establishes |
+|---|---|---|
+| 9 — Native AI streaming | OpenAI-compatible final-answer deltas, offline fake simulation, bounded fallback, controlled single-terminal SSE, cancellation-safe frontend | Mocked provider and stream lifecycle tests; no paid CI |
+| 10 — Deployment automation + edge security | Non-root API/static frontend images, one-shot migration before local traffic, HTTPS edge reference limits and safe smoke probes | Deployment Validation builds both images and checks local migration, health, readiness, OpenAPI and frontend; **not** a cloud rollout |
+| 11 — Advanced RAG + AI quality | Owner-filtered pgvector candidate cap, deterministic reranking/dedup/threshold, context-budget-based citation selection | PostgreSQL owner-isolation tests, context/source tests and small fixture scoring; **not** a guarantee of external-model factual accuracy |
 
-The security model remains unchanged: salted PBKDF2-SHA256 passwords, hashed opaque bearer tokens, expiry and revocation, owned conversations and documents, owner-filtered retrieval, validated registered tools, no arbitrary code/shell/filesystem/SQL/network execution, and no hidden reasoning or credential logging.
-
-To run locally use `.env.example` and `docker compose up --build` (development-only credentials and local one-shot migration). For production configure environment/secret injection and follow [DEPLOYMENT.md](DEPLOYMENT.md). The mandatory production limiter needs a provisioned Redis-compatible service; use a proxy for HTTPS, trusted forwarding, SSE buffering and edge/IP auth protection. SSO/MFA, cloud automation and native provider token streaming remain deferred.
+Stable hashed sessions, PBKDF2 passwords, typed allowlisted tools, bounded requests, PostgreSQL+pgvector and Phase 0–8 APIs remain. The offline runner reports per-category deterministic fixture pass rates with no paid calls or LLM judge. Current Phase 9–11 completion status must be judged against **both green workflows at the final PR HEAD**, not older run numbers. SSO/MFA, real cloud deployment, multilingual lexical tuning and broad live model-quality scoring are deferred.

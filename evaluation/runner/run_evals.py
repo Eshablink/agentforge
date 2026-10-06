@@ -1,92 +1,67 @@
 #!/usr/bin/env python3
-"""Deterministic AgentForge evaluation runner (no paid API calls).
-
-Runs RAG, tool, and agent regression cases against deterministic/fake providers
-and an in-memory retrieval double. Exit code is non-zero on any failure.
-
-This is a deterministic regression suite, not a generative model quality
-benchmark: it checks retrieval/source behavior, tool allowlisting/selection,
-invalid-tool rejection, bounded agent execution, and provider-failure safety.
-"""
-
+"""Deterministic offline RAG, owner scope, tool, agent and stream regressions."""
 from __future__ import annotations
 
 import json
 import sys
 import uuid
 from pathlib import Path
-
 ROOT = Path(__file__).resolve().parents[2]
-BACKEND = ROOT / "backend"
-sys.path.insert(0, str(BACKEND))
-
-from app.services.agent_provider import AgentDecision, DecisionRequest, FakeDecisionProvider, LLMDecisionProvider  # noqa: E402
-from app.services.agent_service import AgentOrchestrationService  # noqa: E402
-from app.services.tool_registry import ToolError, ToolRegistry  # noqa: E402
+sys.path.insert(0, str(ROOT / "backend"))
+from app.services.agent_provider import AgentDecision, FakeDecisionProvider, LLMDecisionProvider
+from app.services.agent_service import AgentOrchestrationService
+from app.services.tool_registry import ToolError, ToolRegistry
+from quality import report_metrics, run_owner_scope, run_ranking, run_stream
 
 
 class InMemoryRetrieval:
-    def __init__(self, results: list[dict]) -> None:
+    def __init__(self, results):
         self.results = results
 
     def search(self, query, top_k=None, *, user_id=None):
         from app.services.retrieval_service import RetrievedChunk
-
         rows = []
         for index, item in enumerate(self.results):
-            def as_uuid(value: str, fallback: str) -> str:
+            def as_uuid(value, fallback):
                 try:
                     return str(uuid.UUID(value))
                 except (ValueError, TypeError):
                     return fallback
             rows.append(RetrievedChunk(
-                chunk_id=as_uuid(item.get("chunk_id"), f"00000000-0000-0000-0000-{index + 1:012d}"),
-                document_id=as_uuid(item.get("document_id"), f"00000000-0000-0000-0000-{index + 101:012d}"),
-                filename=item.get("filename", "f.txt"),
-                chunk_index=index,
-                content=item.get("content", ""),
-                similarity=0.9,
-            ))
+                chunk_id=as_uuid(item.get("chunk_id"), f"00000000-0000-0000-0000-{index+1:012d}"),
+                document_id=as_uuid(item.get("document_id"), f"00000000-0000-0000-0000-{index+101:012d}"),
+                filename=item.get("filename", "f.txt"), chunk_index=index,
+                content=item.get("content", ""), similarity=0.9))
         return rows
 
 
 class RepeatToolProvider(LLMDecisionProvider):
-    def decide(self, request: DecisionRequest) -> AgentDecision:
+    def decide(self, request):
         return AgentDecision(action="tool", tool_name="date_offset", arguments={"days": 0})
 
 
 class RaisingProvider(LLMDecisionProvider):
-    def decide(self, request: DecisionRequest) -> AgentDecision:
+    def decide(self, request):
         raise RuntimeError("sensitive provider detail")
 
 
-def _provider_for(case: dict) -> LLMDecisionProvider:
-    kind = case.get("provider")
-    if kind == "repeat_tool":
-        return RepeatToolProvider()
-    if kind == "raising":
-        return RaisingProvider()
-    return FakeDecisionProvider()
-
-
-def run_rag(case: dict) -> tuple[bool, str]:
-    service = AgentOrchestrationService(FakeDecisionProvider(), ToolRegistry(InMemoryRetrieval(case.get("retrieval", []))))
-    result = service.run(case["question"], user_id=None)
+def run_rag(case):
+    result = AgentOrchestrationService(FakeDecisionProvider(), ToolRegistry(InMemoryRetrieval(case.get("retrieval", [])))).run(case["question"])
     expect = case["expect"]
     if expect.get("retrieved") and not result.sources:
-        return False, f"expected sources, got none (kind={result.answer_kind})"
+        return False, "expected source missing"
     if expect.get("has_source") and not result.sources:
-        return False, "expected at least one source"
+        return False, "source missing"
     if expect.get("answer_kind") and result.answer_kind != expect["answer_kind"]:
-        return False, f"answer_kind={result.answer_kind} expected={expect['answer_kind']}"
+        return False, "wrong answer classification"
     if expect.get("has_filename") and (not result.sources or not result.sources[0].filename):
-        return False, "expected source filename"
+        return False, "missing provenance filename"
     if expect.get("answer_contains") and expect["answer_contains"] not in result.answer:
-        return False, f"answer missing grounding text {expect['answer_contains']!r}"
+        return False, "answer missing supplied evidence"
     return True, ""
 
 
-def run_tool(case: dict) -> tuple[bool, str]:
+def run_tool(case):
     registry = ToolRegistry(InMemoryRetrieval([]))
     expect = case["expect"]
     if case["kind"] == "tool_invalid":
@@ -94,58 +69,50 @@ def run_tool(case: dict) -> tuple[bool, str]:
             registry.execute("python", {"code": "print(1)"})
         except ToolError:
             return True, ""
-        return False, "invalid tool was not rejected"
-    result = AgentOrchestrationService(FakeDecisionProvider(), registry).run(case["question"], user_id=None)
+        return False, "invalid tool accepted"
+    result = AgentOrchestrationService(FakeDecisionProvider(), registry).run(case["question"])
     if expect.get("tool") and expect["tool"] not in result.tools_used:
-        return False, f"expected tool {expect['tool']}, used {result.tools_used}"
+        return False, "wrong tool selected"
     if expect.get("answer_contains") and expect["answer_contains"] not in result.answer:
-        return False, f"answer missing {expect['answer_contains']!r}: {result.answer!r}"
+        return False, "wrong derived answer"
     if expect.get("safe_failure") and result.answer_kind != "INSUFFICIENT_EVIDENCE":
-        return False, f"expected safe failure, got {result.answer_kind}"
+        return False, "unsafe tool failure"
     return True, ""
 
 
-def run_agent(case: dict) -> tuple[bool, str]:
-    service = AgentOrchestrationService(_provider_for(case), ToolRegistry(InMemoryRetrieval([])))
-    result = service.run(case["question"], user_id=None)
+def run_agent(case):
+    provider = RepeatToolProvider() if case.get("provider") == "repeat_tool" else RaisingProvider() if case.get("provider") == "raising" else FakeDecisionProvider()
+    result = AgentOrchestrationService(provider, ToolRegistry(InMemoryRetrieval([]))).run(case["question"])
     expect = case["expect"]
     if expect.get("answer_kind") and result.answer_kind != expect["answer_kind"]:
-        return False, f"answer_kind={result.answer_kind} expected={expect['answer_kind']}"
+        return False, "wrong agent answer classification"
     if expect.get("tools_used") and result.tools_used != expect["tools_used"]:
-        return False, f"tools_used={result.tools_used} expected={expect['tools_used']}"
+        return False, "wrong agent tool use"
     if expect.get("answer_contains") and expect["answer_contains"] not in result.answer:
-        return False, f"answer missing {expect['answer_contains']!r}"
-    if expect.get("safe_failure"):
-        if result.answer_kind != "INSUFFICIENT_EVIDENCE":
-            return False, f"expected safe failure, got {result.answer_kind}"
-        if "sensitive provider detail" in result.answer or "sensitive provider detail" in str(result.events):
-            return False, "provider detail leaked"
+        return False, "wrong agent answer"
+    if expect.get("safe_failure") and (result.answer_kind != "INSUFFICIENT_EVIDENCE" or "sensitive provider detail" in result.answer + str(result.events)):
+        return False, "unsafe provider failure"
     if expect.get("bounded") and len(result.tools_used) > 4:
-        return False, "tool loop not bounded"
+        return False, "unbounded tool loop"
     return True, ""
 
 
-RUNNERS = {"rag": run_rag, "tool": run_tool, "tool_invalid": run_tool, "agent": run_agent}
+RUNNERS = {"rag": run_rag, "ranking": run_ranking, "owner_scope": run_owner_scope, "tool": run_tool, "tool_invalid": run_tool, "agent": run_agent, "stream": run_stream}
 
 
-def main() -> int:
-    datasets = ["evaluation/datasets/rag_cases.json", "evaluation/datasets/tool_cases.json", "evaluation/datasets/agent_cases.json"]
-    failed = 0
-    passed = 0
-    for relative in datasets:
-        cases = json.loads((ROOT / relative).read_text(encoding="utf-8"))
-        for case in cases:
+def main():
+    datasets = ["rag_cases.json", "tool_cases.json", "agent_cases.json", "stream_cases.json", "ownership_cases.json"]
+    successes = []
+    for name in datasets:
+        for case in json.loads((ROOT / "evaluation" / "datasets" / name).read_text(encoding="utf-8")):
             runner = RUNNERS.get(case["kind"])
-            if runner is None:
-                ok, message = False, f"unknown kind {case['kind']}"
-            else:
-                ok, message = runner(case)
-            if ok:
-                passed += 1
-                print(f"PASS {case['id']}")
-            else:
-                failed += 1
-                print(f"FAIL {case['id']}: {message}")
+            ok, message = runner(case) if runner else (False, "unknown evaluation kind")
+            successes.append((case["kind"], ok))
+            print(f"{'PASS' if ok else 'FAIL'} {case['id']}" + (f": {message}" if not ok else ""))
+    for name, value in sorted(report_metrics(successes).items()):
+        print(f"METRIC {name}={value:.3f}")
+    passed = sum(ok for _, ok in successes)
+    failed = len(successes) - passed
     print(f"\n{passed} passed, {failed} failed")
     return 1 if failed else 0
 

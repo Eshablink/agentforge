@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 from urllib.parse import urlparse
+
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
-from app.core.constants import EMBEDDING_DIMENSION_DEFAULT, EMBEDDING_MODEL_DEFAULT, LLM_MODEL_DEFAULT, SUPPORTED_EMBEDDING_DIMENSIONS
+
+from app.core.constants import (
+    EMBEDDING_DIMENSION_DEFAULT,
+    EMBEDDING_MODEL_DEFAULT,
+    LLM_MODEL_DEFAULT,
+    SUPPORTED_EMBEDDING_DIMENSIONS,
+)
 
 
 class Settings(BaseSettings):
@@ -39,6 +46,9 @@ class Settings(BaseSettings):
     max_conversation_context_chars: int = 8000
     rag_top_k_default: int = 5
     rag_top_k_max: int = 10
+    rag_candidate_max: int = 30
+    rag_min_similarity: float = -1.0
+    rag_max_context_chars: int = 6000
     ai_requests_per_minute: int = 20
     auth_attempts_per_minute: int = 10
     max_prompt_chars: int = 5000
@@ -46,7 +56,15 @@ class Settings(BaseSettings):
     max_stream_output_chars: int = 12000
     rate_limit_backend: str = "memory"
     redis_url: str | None = None
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore")
+    redis_ssl_ca_cert: str | None = None
+    forwarded_allow_ips: str = "127.0.0.1"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
 
     @field_validator("app_env")
     @classmethod
@@ -92,12 +110,27 @@ class Settings(BaseSettings):
             raise ValueError("agent execution limits exceed safe configured bounds")
         if not 0 <= self.llm_max_retries <= 3 or not 0 < self.llm_timeout_seconds <= 60:
             raise ValueError("provider timeout/retry settings exceed safe bounds")
-        limits = (self.max_upload_size_bytes, self.max_request_body_bytes, self.max_conversation_messages,
-                  self.max_conversation_context_chars, self.ai_requests_per_minute, self.auth_attempts_per_minute,
-                  self.max_prompt_chars, self.max_stream_duration_seconds, self.max_stream_output_chars,
-                  self.max_extracted_chars, self.max_pdf_pages, self.max_document_chunks, self.embedding_batch_size)
+        limits = (
+            self.max_upload_size_bytes,
+            self.max_request_body_bytes,
+            self.max_conversation_messages,
+            self.max_conversation_context_chars,
+            self.ai_requests_per_minute,
+            self.auth_attempts_per_minute,
+            self.max_prompt_chars,
+            self.max_stream_duration_seconds,
+            self.max_stream_output_chars,
+            self.max_extracted_chars,
+            self.max_pdf_pages,
+            self.max_document_chunks,
+            self.embedding_batch_size,
+        )
         if any(value < 1 for value in limits) or self.embedding_batch_size > 128 or self.max_document_chunks > 5000 or self.max_extracted_chars > 5_000_000:
             raise ValueError("configured resource limits exceed safe bounds")
+        if not (1 <= self.rag_top_k_default <= self.rag_top_k_max <= 10 and self.rag_top_k_max <= self.rag_candidate_max <= 40):
+            raise ValueError("RAG candidate and top-k bounds are invalid")
+        if not -1 <= self.rag_min_similarity <= 1 or not 200 <= self.rag_max_context_chars <= 12000:
+            raise ValueError("RAG similarity or context bounds are invalid")
         if make_url(self.database_url).drivername != "postgresql+psycopg":
             raise ValueError("PostgreSQL with psycopg is required")
         if self.rate_limit_backend == "redis":
@@ -117,9 +150,12 @@ class Settings(BaseSettings):
                 raise ValueError("production requires a shared rate limiter")
             if urlparse(self.redis_url or "").scheme != "rediss":
                 raise ValueError("production REDIS_URL must use TLS (rediss://)")
-            if self.llm_provider == "openai" or self.embedding_provider == "openai":
-                if not self.openai_api_key:
-                    raise ValueError("OPENAI_API_KEY required for selected provider")
+            if self.llm_provider == "fake" or self.embedding_provider == "fake":
+                raise ValueError("production requires real LLM and embedding providers")
+            if self.openai_api_key is None or not self.openai_api_key.strip():
+                raise ValueError("OPENAI_API_KEY required for selected production provider")
+            if "*" in self.forwarded_allow_ips:
+                raise ValueError("production forwarded proxy trust cannot be wildcard")
         return self
 
     @property

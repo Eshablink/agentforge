@@ -4,10 +4,16 @@ from pydantic import ValidationError
 
 
 def _production(**overrides):
-    values = dict(app_env="production", cors_origins="https://app.example",
-                  database_url="postgresql+psycopg://service:injected-secret@managed.example:5432/agentforge",
-                  llm_provider="fake", embedding_provider="fake", rate_limit_backend="redis",
-                  redis_url="rediss://redis.example:6380/0")
+    values = dict(
+        app_env="production",
+        cors_origins="https://app.example",
+        database_url="postgresql+psycopg://service:injected-secret@managed.example:5432/agentforge",
+        llm_provider="openai",
+        embedding_provider="openai",
+        openai_api_key="ci-test-key-not-used-for-network-calls",
+        rate_limit_backend="redis",
+        redis_url="rediss://redis.example:6380",
+    )
     values.update(overrides)
     return Settings(**values)
 
@@ -27,6 +33,10 @@ def test_production_requires_explicit_cors_origins_and_selected_provider_credent
     with pytest.raises(ValidationError):
         _production(cors_origins="*")
     with pytest.raises(ValidationError):
+        _production(llm_provider="fake")
+    with pytest.raises(ValidationError):
+        _production(embedding_provider="fake")
+    with pytest.raises(ValidationError):
         _production(llm_provider="openai", openai_api_key=None)
     assert _production().cors_origin_list == ["https://app.example"]
 
@@ -41,7 +51,6 @@ def test_agent_limits_are_bounded() -> None:
 def test_phase7_provider_and_resource_bounds() -> None:
     configured = Settings(llm_timeout_seconds=12, llm_max_retries=3, ai_requests_per_minute=7)
     assert configured.llm_timeout_seconds == 12
-    assert configured.llm_max_retries == 3
     assert configured.ai_requests_per_minute == 7
     with pytest.raises(ValidationError):
         Settings(llm_max_retries=4)

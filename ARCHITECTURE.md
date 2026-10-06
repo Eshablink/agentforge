@@ -1,27 +1,21 @@
-# AgentForge Architecture
+# AgentForge architecture
 
-**Baseline:** Phases 0–7 COMPLETE on `main`; Phase 7 PR #9 MERGED in `63d7d3f0d417d06b2e57fa63874824de4306450d`, verified by main CI run 37320957004. Phase 8 hardens deployment without changing the owner-aware RAG, typed tools, bounded memory or existing public APIs.
+Phases 0–8 are COMPLETE and MERGED on main at `97934d7dd7f016a4d13f17b2afd4e577024d85a1`. Phases 9–11 are implemented in PR #11 and require green results for the final branch HEAD before merge. They are not deployed to a production cloud environment.
 
-## Serving path
+## Stream delivery (Phase 9)
 
-The React/Vite build uses an HTTPS `VITE_API_BASE_URL` or same-origin reverse proxy for JSON and authenticated SSE. The TLS-terminating proxy forwards bearer headers only to the API and disables SSE buffering/caching. FastAPI handles authentication and owner checks, then conversation/agent services invoke allowlisted calculator, date, or owner-filtered document-search tools; PostgreSQL + pgvector stores relational/vector data. The application container does not run migrations: a separate one-shot Alembic job upgrades the schema before startup. Failed migrations stop rollout.
+Authenticated `/agent/chat/stream` owns exactly one request-ID-correlated `message_start`. The structured decision/provider-independent typed allowlisted tool loop remains intact. OpenAI-compatible native final-answer text deltas are normalized into bounded `token` events; fake simulated deltas and completed-answer fallback have explicit mode labels. The route emits one terminal `message_end` or safe `error`, persists only successful owned conversations and closes streams on disconnect. Native deltas are for final answers, not tool decisions. Telemetry contains duration, first-token latency, counts and categories—never answer text, raw provider frames or hidden reasoning.
 
-## Configuration and dependency gates
+## Deployment validation (Phase 10)
 
-`APP_ENV` is development, test or production. Production requires explicitly injected PostgreSQL+psycopg URL with non-development host/credentials, explicit HTTPS CORS origins, explicit provider choices, and Redis shared limiting. `AUTH_SECRET` was unused by the hashed opaque-token model and has been removed from the example and local compose. No secrets are baked into images or Vite. `/health` is liveness (no external access); `/ready` checks `SELECT 1` and Redis ping when shared limiting is selected, returning a safe 503 on failure. No model calls are made in probes.
+One-shot Alembic migrations precede serving; PostgreSQL+pgvector and Redis are required for an external production deployment. `/health` has no paid or database calls; `/ready` checks serving dependencies. The separate Deployment Validation workflow builds non-root backend/static frontend production images, exercises PostgreSQL+pgvector and TLS Redis in production mode, rejects fake providers, runs one-shot migration before traffic, and probes health/readiness and smoke endpoints. The reference HTTPS proxy keeps health/readiness outside AI throttling and enforces bounded bodies, trusted forwarding and SSE no-buffer/no-store behavior.
 
-## Rate limiting and abuse protection
+## Evidence retrieval (Phase 11)
 
-Both in-memory sliding window (development/test) and Redis atomic fixed-window implementations satisfy the same `Limiter` protocol. Production cannot select memory; Redis connection failures fail closed. AI limiter keys are authenticated user IDs; registration/login keys are hashes of normalized email addresses. A proxy should additionally impose edge/IP abuse limits because email-only throttling cannot prevent distributed account spraying. Both stores bound window duration; Redis keys expire automatically. Limiters do not persist bearer credentials.
+The database `Document.user_id` filter applies **before** pgvector candidate ordering and limit. The candidate pool defaults to 30 and cannot exceed 40. Deterministic reranking combines cosine similarity with a small lexical-overlap bonus; non-finite/low similarities are filtered, normalized duplicate text is suppressed, and ties break by similarity, document ID, chunk index and chunk ID. At most 10 chunks become results. RAG packs only text fitting the bounded context budget and returns only sources actually used there; empty retrieval or blank answer returns explicit insufficient evidence. This bounds provenance, not arbitrary external-model factual correctness.
 
-## Bounded ingestion and maintenance
+The offline evaluation includes source/grounding fixtures, relevance and deduplication, threshold, SQL owner-predicate shape, valid/invalid tools, bounded agent/provider failures, simulated stream ordering/terminal/error/output-budget cases. Metric values are deterministic per-fixture pass rates rather than live hit rates or hallucination guarantees. PostgreSQL integration tests independently verify cross-user isolation. No SQLite fallback, LLM-as-judge, paid API CI or model-controlled unsafe execution.
 
-Extraction stops on byte/page/character thresholds. Ingestion checks estimated chunk count before allocating chunks, and flushes embedding batches within one transaction. On failure the transaction rolls back. `python cleanup_sessions.py` deletes at most 500 expired session records per run; active sessions are retained. Cleanup never runs in application startup or request flow.
+## Remaining limits
 
-## Existing safety contracts
-
-`/agent/chat` remains backward compatible; SSE delivers generated output in bounded chunks, not provider-native tokens. Authenticated stream and conversation owner checks remain, with one request ID in response header, SSE start and telemetry. No arbitrary Python, shell, filesystem, generated SQL, or unrestricted network tools execute. The evaluation suite remains deterministic and free of paid provider calls.
-
-## Operational limitations
-
-This branch has not been deployed. Redis provides shared fixed-window rather than strict sliding-window behavior; managed PostgreSQL/pgvector, Redis and HTTPS termination must be provisioned externally. Reverse proxies must configure trusted forwarded addresses, SSE buffering and timeouts; see DEPLOYMENT.md. SSO/MFA and cloud infrastructure automation are deferred.
+English-oriented lexical overlap and the default permissive similarity threshold need deployment-specific evaluation. HTTPS proxy, Redis and managed database are operator-provisioned; SSO/MFA and broader language-aware retrieval remain deferred. See [DEPLOYMENT.md](DEPLOYMENT.md) for operational rollout and [PROGRESS.md](PROGRESS.md) for exact final-HEAD verification.

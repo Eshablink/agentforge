@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -14,62 +14,103 @@ from sqlalchemy.orm import Session
 from app.core.rate_limit import RateLimitExceeded, ai_request_limiter
 from app.core.settings import get_settings
 from app.core.telemetry import record, reset_request_id, set_request_id
-from app.db.dependencies import get_db
+from app.db.session import SessionLocal
 from app.models.conversation import Conversation, Message
 from app.models.user import User
 from app.schemas.platform import AgentChatRequest
 from app.schemas.stream import StreamEvent
 from app.services.agent_provider import FakeDecisionProvider, OpenAIDecisionProvider
 from app.services.auth_service import current_user
-from app.services.retrieval_service import RetrievalService
+from app.services.retrieval_service import SessionScopedRetrieval
 from app.services.stream_agent_service import StreamAgentService
 from app.services.tool_registry import ToolRegistry
 
 router = APIRouter(tags=["agent", "streaming"])
 
 
-def _stream_service(db: Session) -> StreamAgentService:
-    retrieval = RetrievalService(db)
+def _stream_service() -> StreamAgentService:
     settings = get_settings()
-    provider = (OpenAIDecisionProvider(settings.openai_api_key, settings.llm_model)
-                if settings.llm_provider.lower() == "openai" and settings.openai_api_key
-                else FakeDecisionProvider())
+    retrieval = SessionScopedRetrieval(SessionLocal)
+    provider = (
+        OpenAIDecisionProvider(settings.openai_api_key, settings.llm_model)
+        if settings.llm_provider.lower() == "openai" and settings.openai_api_key
+        else FakeDecisionProvider()
+    )
     return StreamAgentService(provider, ToolRegistry(retrieval))
 
 
-def _owned_conversation(db: Session, user: User, conversation_id: UUID) -> Conversation:
-    conversation = db.scalar(select(Conversation).where(Conversation.id == conversation_id, Conversation.user_id == user.id))
+def _owned_conversation(db: Session, user_id: UUID, conversation_id: UUID) -> Conversation:
+    conversation = db.scalar(
+        select(Conversation).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user_id,
+        )
+    )
     if conversation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+        raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
 
 
 def _memory_context(db: Session, conversation: Conversation) -> str:
     settings = get_settings()
-    recent = db.scalars(select(Message).where(Message.conversation_id == conversation.id).order_by(Message.created_at.desc(), Message.id.desc()).limit(settings.max_conversation_messages)).all()
-    return "\n".join(f"{message.role}: {message.content[:1200]}" for message in reversed(recent))[-settings.max_conversation_context_chars:]
+    recent = db.scalars(
+        select(Message)
+        .where(Message.conversation_id == conversation.id)
+        .order_by(Message.created_at.desc(), Message.id.desc())
+        .limit(settings.max_conversation_messages)
+    ).all()
+    return "\n".join(
+        f"{message.role}: {message.content[:1200]}" for message in reversed(recent)
+    )[-settings.max_conversation_context_chars:]
 
 
-def _persist_exchange(db: Session, conversation: Conversation, question: str, answer: str, answer_kind: str, tools_used: list[str], sources: list[dict]) -> None:
-    db.add_all([Message(conversation_id=conversation.id, role="user", content=question),
-                Message(conversation_id=conversation.id, role="assistant", content=answer,
-                        metadata_json={"answer_kind": answer_kind, "tools_used": tools_used, "sources": sources,
-                                       "events": [{"event": "streamed"}]})])
-    conversation.updated_at = datetime.now(timezone.utc); db.commit()
+def _persist_exchange(
+    conversation_id: UUID,
+    user_id: UUID,
+    question: str,
+    answer: str,
+    answer_kind: str,
+    tools_used: list[str],
+    sources: list[dict],
+) -> None:
+    with SessionLocal() as db:
+        conversation = _owned_conversation(db, user_id, conversation_id)
+        db.add_all(
+            [
+                Message(conversation_id=conversation.id, role="user", content=question),
+                Message(
+                    conversation_id=conversation.id,
+                    role="assistant",
+                    content=answer,
+                    metadata_json={
+                        "answer_kind": answer_kind,
+                        "tools_used": tools_used,
+                        "sources": sources,
+                        "events": [{"event": "streamed"}],
+                    },
+                ),
+            ]
+        )
+        conversation.updated_at = datetime.now(timezone.utc)
+        db.commit()
 
 
 @router.post("/agent/chat/stream")
-async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
+async def agent_chat_stream(
+    payload: AgentChatRequest,
+    request: Request,
+    user: User = Depends(current_user),
+):
     settings = get_settings()
     if len(payload.question) > settings.max_prompt_chars:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Prompt exceeds maximum allowed size")
+        raise HTTPException(status_code=413, detail="Prompt exceeds maximum allowed size")
     content_length = request.headers.get("content-length")
     if content_length:
         try:
             if int(content_length) > settings.max_request_body_bytes:
-                raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Request body exceeds maximum allowed size")
+                raise HTTPException(status_code=413, detail="Request body exceeds maximum allowed size")
         except ValueError as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Content-Length") from exc
+            raise HTTPException(status_code=400, detail="Invalid Content-Length") from exc
     request_id = getattr(request.state, "request_id", None)
     if not request_id:
         raise RuntimeError("Canonical request ID middleware is not installed")
@@ -77,42 +118,86 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
         ai_request_limiter.check(str(user.id))
     except RateLimitExceeded as exc:
         record("rate_limit", category="ai")
-        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
-    conversation = _owned_conversation(db, user, payload.conversation_id) if payload.conversation_id is not None else None
-    context = _memory_context(db, conversation) if conversation is not None else ""
-    service = _stream_service(db)
-    started = time.perf_counter()
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+
+    conversation_id = payload.conversation_id
+    context = ""
+    if conversation_id is not None:
+        with SessionLocal() as db:
+            conversation = _owned_conversation(db, user.id, conversation_id)
+            context = _memory_context(db, conversation)
+
+    service = _stream_service()
+    started = time.monotonic()
 
     async def event_generator():
-        context_token = set_request_id(request_id)
+        token = set_request_id(request_id)
         completed = False
+        output: list[str] = []
+        terminal = False
+        stream = service.stream(payload.question, context=context, user_id=user.id)
         try:
-            answer_parts: list[str] = []
-            answer_kind = "INSUFFICIENT_EVIDENCE"
-            tools_used: list[str] = []
-            sources: list[dict] = []
-            yield _sse("message_start", {"request_id": request_id, "conversation_id": str(conversation.id) if conversation else None})
-            for event_name, data in service.stream(payload.question, context=context, user_id=user.id):
-                if event_name == "token":
-                    answer_parts.append(data.get("text", ""))
-                elif event_name == "message_end":
-                    answer_kind = data.get("answer_kind", answer_kind)
-                    tools_used = data.get("tools_used", tools_used)
-                    sources = data.get("sources", sources)
+            yield _sse(
+                "message_start",
+                {"request_id": request_id, "conversation_id": str(conversation_id) if conversation_id else None},
+            )
+            for name, data in stream:
+                if await request.is_disconnected():
+                    record("stream_disconnect", request_id=request_id)
+                    break
+                if name == "token":
+                    output.append(data["text"])
+                elif name == "message_end":
                     completed = True
-                yield _sse(event_name, data)
-            if conversation is not None and completed:
-                try:
-                    _persist_exchange(db, conversation, payload.question, "".join(answer_parts)[:settings.max_stream_output_chars], answer_kind, tools_used, sources)
-                except Exception:
-                    db.rollback(); record("agent_stream_persist_error", request_id=request_id, user_id=str(user.id))
-            record("agent_stream_complete", request_id=request_id, latency_ms=round((time.perf_counter() - started) * 1000, 3), success=completed)
+                if name in {"message_end", "error"}:
+                    if terminal:
+                        break
+                    terminal = True
+                yield _sse(name, data)
+                if terminal:
+                    if completed and conversation_id is not None and not await request.is_disconnected():
+                        try:
+                            _persist_exchange(
+                                conversation_id,
+                                user.id,
+                                payload.question,
+                                "".join(output),
+                                data["answer_kind"],
+                                data["tools_used"],
+                                data["sources"],
+                            )
+                        except Exception:
+                            record("stream_persist_failure", request_id=request_id, error_category="storage")
+                    break
+            record(
+                "agent_stream_complete",
+                request_id=request_id,
+                terminal=terminal,
+                success=completed,
+                duration_ms=round((time.monotonic() - started) * 1000, 3),
+            )
         except asyncio.CancelledError:
-            record("agent_stream_cancelled", request_id=request_id, latency_ms=round((time.perf_counter() - started) * 1000, 3)); raise
+            record(
+                "agent_stream_cancelled",
+                request_id=request_id,
+                terminal=False,
+                success=False,
+                error_category="cancelled",
+            )
+            raise
         finally:
-            reset_request_id(context_token)
+            stream.close()
+            reset_request_id(token)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no", "X-Request-Id": request_id})
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-store",
+            "X-Accel-Buffering": "no",
+            "X-Request-Id": request_id,
+        },
+    )
 
 
 def _sse(event: str, data: dict) -> str:

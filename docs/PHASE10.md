@@ -1,0 +1,7 @@
+# Phase 10: deployment automation and edge security
+
+Phase 8 is complete and merged. Phase 10 ships a non-root static frontend image and reference HTTPS edge configuration for IP authentication/AI limits, concurrent stream cap, bounded request bodies and unbuffered, non-cacheable SSE. The existing non-root API image and one-shot migration job remain unchanged. The safe `deploy/smoke.py` probes `/health`, `/ready`, `/openapi.json`, and the frontend root without provider calls. Deployment Validation additionally provisions PostgreSQL+pgvector and TLS Redis in a production-like runtime.
+
+Production requires managed PostgreSQL+pgvector, Redis/TLS, explicit HTTPS origins and injected secrets. The edge proxy configuration is illustrative, not a ready-to-use certificate or cloud deployment. Trust only explicitly configured proxy IPs; never trust all forwarded headers. Validate configuration, back up the DB, run one migration job, gate traffic on readiness and monitor the rollout. Database downgrade and rollback are not automatic.
+
+`.github/workflows/deployment-validation.yml` is present and builds backend and frontend production images, runs Alembic before API startup, then checks health, readiness and local smoke endpoints. Phase 10 was verified at `84ce290b1544bd50cae17b62d6fd0998304aad41`: Deployment Validation run 37430440521 and AgentForge CI run 37430440494 passed. Later Phase 11 work requires both workflows green again on the PR's final HEAD. No real deployment was performed.

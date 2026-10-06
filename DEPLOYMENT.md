@@ -1,25 +1,15 @@
-# AgentForge production deployment runbook
+# AgentForge deployment runbook
 
-Phase 7 PR #9 is merged on main at `63d7d3f0d417d06b2e57fa63874824de4306450d` and verified by main CI 37320957004. Phase 8 prepares but does not itself deploy a vendor-neutral container release.
+Phases 0–8 are COMPLETE and MERGED on main. Phases 9–11 are implemented on PR #11 and deployment-artifact validated only when the **final PR HEAD** has a green `AgentForge Deployment Validation` workflow. **No cloud production deployment has occurred.**
 
-## Dependencies and configuration
+## Operator rollout (not performed by CI)
 
-Provision managed PostgreSQL with pgvector, Redis-compatible shared rate limiting over TLS, and an HTTPS-terminating reverse proxy. Inject secrets through environment/secret management, not source code or image build arguments. Production requires APP_ENV=production, explicit non-development DATABASE_URL with postgresql+psycopg, HTTPS CORS_ORIGINS, RATE_LIMIT_BACKEND=redis, REDIS_URL=rediss://..., and explicit LLM_PROVIDER and EMBEDDING_PROVIDER. Inject OPENAI_API_KEY when either selected provider is openai. Fake providers are intended for tests/development, not externally useful AI answers. AUTH_SECRET was unused and removed; existing PBKDF2 and hashed opaque sessions remain.
+1. Provision managed PostgreSQL+pgvector, Redis over TLS, an HTTPS reverse proxy and injected secrets. Production settings require explicit non-development PostgreSQL credentials, HTTPS CORS origin, provider selection and shared Redis limiting.
+2. Back up data, then run `alembic -c alembic.ini upgrade head` **once** using the backend image before routing traffic. A failed migration stops rollout; rollback of database schema is not automatic or necessarily safe.
+3. Start the unprivileged backend and static frontend images; gate traffic on backend `/ready`. `/health` is cheap liveness; `/ready` checks serving dependencies. The Deployment Validation workflow builds both production images, uses PostgreSQL+pgvector plus a TLS-enabled Redis validation service, runs Alembic once before serving traffic, validates production settings and fake-provider rejection, proves `/ready` fails closed when Redis is unavailable, runs backend/frontend smoke probes and checks Nginx syntax. It does not make paid provider calls or deploy a cloud service.
+4. Configure `deploy/nginx.edge.example.conf` for real domains, certificates and upstreams. Restrict direct API access. Trust only proxy IPs via Uvicorn `--forwarded-allow-ips` (never `*`); enforce edge IP authentication/AI limits, concurrent streams and request body caps. SSE requires `proxy_buffering off`, `proxy_cache off`, `Cache-Control: no-store`, sufficient read timeout and disconnect forwarding. API bearer credentials must never be logged.
+5. Monitor request-ID-correlated, content-free status, readiness, rate-limit and stream lifecycle metrics. Schedule the bounded expired-session cleanup separately; repeat in batches if needed. Image/traffic rollback must be planned by the operator; no automatic rollback is implemented.
 
-The .env.example file is for local development, not production. For cross-origin UI builds set VITE_API_BASE_URL to an HTTPS backend URL. Otherwise omit it and proxy API routes through the UI origin. Vite values are embedded in public builds, so never place secrets in VITE_* variables.
+## Provider, retrieval and evaluation limits
 
-## Safe rollout
-
-1. Verify PostgreSQL and pgvector availability; grant schema privileges only to a one-shot migration job. Back up the database and rehearse rollback.
-2. From the backend image and working directory run `alembic -c alembic.ini upgrade head` once. Fail rollout on migration failure; do not migrate concurrently in API replicas. Local compose gates API startup on this one-shot job.
-3. Start backend API with `uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips <trusted-proxy-addresses>`. Restrict direct backend ingress and do not trust arbitrary forwarded headers. GET /health is cheap liveness; GET /ready checks DB and Redis when selected. Gate traffic on readiness; probes never call paid LLMs.
-4. Terminate TLS at the proxy, pass Authorization and trusted Host/proto, disable buffering on `/agent/chat/stream` (honor X-Accel-Buffering: no), and do not cache authenticated responses. SSE sends Cache-Control: no-store. Configure proxy request/body limits and read timeouts longer than stream duration plus provider retry budget, and propagate disconnects. The app does not terminate TLS.
-5. Build the frontend with `npm run build` and serve `dist/` via a static host/proxy. The frontend Dockerfile runs a development Vite server, not a production static server. Local docker compose uses development credentials and is not a production template.
-
-## Maintenance and signals
-
-Schedule `python cleanup_sessions.py` from the backend directory: each run removes at most 500 expired records; no active session is deleted. Monitor request-ID-correlated HTTP/readiness/rate-limit/stream status and latency. Do not log prompts, document text, credentials, raw provider exceptions or hidden reasoning.
-
-## Limits
-
-Redis uses atomic fixed windows rather than strict sliding windows; shared-store failures fail closed. Hashed-email auth throttling must be complemented by edge/IP abuse controls against account spraying. Provider timeout is per attempt; retries add elapsed time. There is no live deployment, SSO/MFA, cloud provisioning, distributed tracing or provider-native token streaming.
+OpenAI-compatible native final-answer text deltas are supported after structured decisions; fake and completed-answer fallback modes are explicit. Tool calls remain typed, validated and owner-scoped. PostgreSQL owner predicate applies before a bounded candidate rerank; RAG sources represent included context, not mathematical proof of generated claims. Deterministic CI fixture pass rates do not measure real-world model factuality or retrieval hit rate. The Redis limiter uses a fixed window with boundary bursts, and the edge example is a template rather than a production configuration. No paid provider or real cloud credential is used for CI. SSO/MFA and broad live model-quality benchmarking remain deferred.

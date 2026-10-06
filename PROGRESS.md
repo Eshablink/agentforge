@@ -1,19 +1,19 @@
-# AgentForge Progress
+# AgentForge progress
 
-**Verified main baseline:** Phases 0–7 complete. Phase 7 PR #9 merged at `63d7d3f0d417d06b2e57fa63874824de4306450d`; GitHub Actions main run 37320957004 succeeded (PostgreSQL + pgvector, Alembic, import smoke, full pytest including deterministic evaluation, frontend build). Phase 8 is implemented on `feat/agentforge-phase-8` and requires final PR-head green CI before it may be called ready. No Phase 8 production environment has been deployed.
+**Merged baseline:** Phases 0–8 are complete on `main` at `97934d7dd7f016a4d13f17b2afd4e577024d85a1` (Phase 8 PR #10). Phases 9, 10 and 11 are implemented and verified separately on the existing PR #11 branch. They are **not merged or deployed**; only checks for the final PR HEAD verify the final artifact.
 
-## Phase 8 implementation
+## Phase acceptance gates
 
-- Production configuration: distinct development/test/production selection; explicit managed PostgreSQL URL, HTTPS CORS origins, provider choice and Redis limiter in production; reject default DB credentials, SQLite and unsafe resource ceilings. Removed unused `AUTH_SECRET` from examples.
-- Deployment: non-root API image does not run migrations. Local compose has a one-shot migration service gated on DB health; production runbook mandates one migration job and traffic gating. `/health` stays cheap; `/ready` checks DB and shared limiter using safe status-only responses.
-- Rate/auth: protocol-based local sliding-window and atomic Redis fixed-window shared implementations; production fails closed on Redis failure. Hashed normalized email throttles registration/login, with edge/IP protections deferred to deployment. Sessions can be cleaned in batches through explicit command without affecting active sessions.
-- Pressure/UX: PDF page/extracted-text and document chunk ceilings; bounded embedding batches in a transaction; frontend uses configured HTTPS or same-origin API base including SSE rather than a localhost production URL. Request-ID telemetry and typed SSE remain unchanged.
-- Security and compatibility: Phase 0–7 routes remain; owner-filtered retrieval/conversations and safe tool boundaries preserved. Production is not a claim of deployment; see DEPLOYMENT.md for requirements.
+| Phase | Implementation | Evidence and limits |
+|---|---|---|
+| 9 — Native AI streaming | Final-answer OpenAI-compatible deltas, offline fake simulation and bounded fallback; one terminal event, cancellation-safe UI | Offline mocked-provider and lifecycle tests; no paid provider calls |
+| 10 — Deployment automation and edge security | Separate non-root frontend image, trusted proxy example, migration-before-traffic validation, safe smoke probes | Deployment Validation builds both images, runs Alembic before serving and probes `/health`, `/ready`, OpenAPI and frontend locally; no real deployment |
+| 11 — Advanced RAG + AI quality | SQL owner filter before bounded pgvector candidates; deterministic relevance ordering, threshold and duplicate suppression; bounded context and only included-source citations | PostgreSQL cross-user tests, SQL predicate tests, context-source regressions, deterministic small fixtures and streaming lifecycle evaluation |
 
-## Verification
+## Final verification protocol
 
-Use the latest Phase 8 PR-head GitHub Actions result, not an earlier Phase 7 run, to verify this branch. Existing CI provisions PostgreSQL + pgvector, upgrades Alembic, imports the application, runs complete backend pytest (which invokes the deterministic evaluation runner) and builds the frontend. New tests cover production config, shared/local limiters, readiness failure, ingestion pressure, auth throttling and session cleanup. No paid API calls occur in CI.
+On the final HEAD, AgentForge CI must pass PostgreSQL+pgvector Alembic upgrade, import smoke, complete backend pytest (which invokes the deterministic evaluation runner), and TypeScript/Vite production build. Deployment Validation must pass backend and frontend production image builds, migration-before-traffic, backend health/readiness, OpenAPI and frontend smoke probes. The standard CI uses fake providers for deterministic tests; Deployment Validation separately exercises production configuration with structurally valid OpenAI provider settings but makes no paid model calls. Check both workflow results and exact commit SHA on PR #11; historical green checks are not final evidence.
 
-## Limitations
+## Quality limitations
 
-Redis limiting is an atomic fixed window rather than a strict sliding window; shared Redis must be provisioned externally. Auth throttling by hashed email is not a substitute for proxy-level IP and bot protection. There is no SSO/MFA or cloud automation; the frontend dev Docker image is not a production static server. SSE still delivers bounded chunks of generated text rather than provider-native tokens. The application does not terminate TLS; use a trusted HTTPS reverse proxy.
+The evaluation runner reports fixture pass rates for RAG, tool, agent and stream groups, not live hit rate, model factual accuracy or an LLM-as-judge score. SQL owner-query fixtures and PostgreSQL integration tests cover distinct isolation boundaries. Bounded context and source provenance do not guarantee that every generated sentence is true. Native deltas are only final-answer text, after structured tool decisions. No cloud production environment has been deployed; Redis/TLS/managed PostgreSQL must be provisioned by an operator. SSO/MFA and general multilingual retrieval tuning remain deferred.

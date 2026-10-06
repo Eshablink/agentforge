@@ -1,0 +1,4 @@
+[
+  {"id":"owner_candidate_scope","kind":"owner_scope","expected_owner":"00000000-0000-0000-0000-000000000111"},
+  {"id":"legacy_unowned_scope","kind":"owner_scope","expected_owner":null}
+]

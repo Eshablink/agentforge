@@ -1,0 +1,6 @@
+[
+  {"id":"stream_simulated_order","kind":"stream","question":"7 * 8","expect":{"answer_contains":"56","terminal":"message_end","tool":"calculator","mode":"simulated"}},
+  {"id":"stream_insufficient_evidence","kind":"stream","question":"unavailable document evidence","expect":{"terminal":"message_end","answer_kind":"INSUFFICIENT_EVIDENCE"}},
+  {"id":"stream_provider_failure_safe","kind":"stream","question":"unknown","provider":"broken","expect":{"terminal":"error","no_private":true}},
+  {"id":"stream_output_budget","kind":"stream","question":"direct","provider":"direct","max_output_chars":5,"expect":{"terminal":"error","max_chars":5}}
+]

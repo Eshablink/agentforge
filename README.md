@@ -1,24 +1,22 @@
 # AgentForge
 
-AgentForge provides PostgreSQL/pgvector RAG, typed safe agent tools, authenticated conversations, and incremental SSE delivery. **Phases 0–7 are complete**; Phase 7 PR #9 merged to `main` in `63d7d3f0d417d06b2e57fa63874824de4306450d` with passing main CI. Phase 8 adds production deployment hardening on this branch; this is not a claim that a live environment has been deployed.
+Phases 0–8 are COMPLETE and MERGED into main (`97934d7dd7f016a4d13f17b2afd4e577024d85a1`). PR #11 implements Phases 9, 10 and 11 on `feat/agentforge-phases-9-11`; these phases are CI-verifiable on the branch but remain **unmerged and not deployed**.
 
-## Phase 8 overview
+## Capabilities
 
-Production configuration now requires explicit PostgreSQL credentials and host, HTTPS CORS origins, explicit provider selection and Redis-backed rate limiting. `/health` is dependency-free liveness; `/ready` tests PostgreSQL and the shared limiter without paid calls. A one-shot Alembic migration must complete before API startup; runtime replicas do not migrate. The API container runs as a non-root user. The browser uses a configured HTTPS API URL or same-origin proxy (also for SSE).
+- **Phase 9 — native final-answer deltas:** OpenAI-compatible provider streams normalized answer text after a validated structured decision. The fake is offline/simulated; unsupported providers use bounded fallback. `/agent/chat` remains backward compatible. Exactly one request-level start and one successful end or safe error; cancelled/incomplete streams do not persist successful assistant messages.
+- **Phase 10 — deployment validation and edge safety:** non-root backend and static frontend images; separate one-shot migrations; CI locally builds images, migrates PostgreSQL+pgvector and probes `/health`, `/ready`, OpenAPI and frontend. A reference HTTPS edge config includes IP throttling, stream connection limits, request size and SSE no-buffer/no-cache. No cloud rollout occurs.
+- **Phase 11 — bounded RAG quality:** owner scope is enforced in the SQL candidate query before a small pgvector candidate pool; deterministic lexical/cosine reranking, threshold and duplicate suppression select up to 10 chunks. RAG only lists sources whose content fits the bounded context. Insufficient evidence remains explicit.
 
-A shared atomic fixed-window limiter protects AI endpoints, while hashed normalized email keys throttle registration/login; shared-store failure blocks expensive/auth calls rather than silently disabling protection. Extraction/page/chunk limits and small embedding batches bound ingestion pressure. Expired sessions can be pruned via explicit bounded maintenance. See [DEPLOYMENT.md](DEPLOYMENT.md) for setup, TLS proxying, migration rollout, probes, SSE buffering and operational limits.
+The offline version-controlled evaluation reports deterministic fixture pass rates for RAG, tools, agents and streaming, not live factual accuracy. It runs without paid calls or an LLM judge. PostgreSQL integration tests separately verify owner isolation. Source provenance and prompt constraints do **not** prove an external model cannot hallucinate.
 
-## Local development
+## Local development and verification
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-The compose stack is **development only**; its one-shot migration service gates API startup on PostgreSQL health. For tests/CI, use PostgreSQL + pgvector, fake providers, and `pytest` in `backend/`. Full pytest invokes `evaluation/runner/run_evals.py` without paid API calls. Frontend verification is `npm run build` in `frontend/`. Browser `VITE_API_BASE_URL` is optional for same-origin proxying; when set in production it must be an HTTPS URL.
+Compose is development-only. For CI, see `.github/workflows/ci.yml` and `.github/workflows/deployment-validation.yml`; the exact **final PR HEAD** must have green results in both. AgentForge CI runs Alembic, import smoke, PostgreSQL-backed full pytest (including the evaluation runner) and frontend production build. Deployment Validation builds both images and performs local migration, readiness and smoke validation. See [DEPLOYMENT.md](DEPLOYMENT.md) for operator rollout; **nothing has been deployed to a production account**.
 
-## Security and limits
-
-Only allowlisted, validated tools execute; there is no arbitrary Python, shell, filesystem, generated SQL or unrestricted network tool. Passwords use salted PBKDF2 and bearer tokens persist only as hashes; owner-scoped retrieval/conversations remain intact. No hidden reasoning, credentials, prompts or raw document contents are logged. Phase 7 SSE is transport-level chunk delivery, not provider-native token generation.
-
-There is no cloud deployment, SSO/MFA or native TLS termination. Redis fixed-window limiting is shared across replicas but needs a provisioned backend; add edge/IP abuse controls for public authentication. Session cleanup is an operator-scheduled command, not a background startup task. See [ARCHITECTURE.md](ARCHITECTURE.md), [PROGRESS.md](PROGRESS.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
+Phase detail: [Phase 9](docs/PHASE9.md), [Phase 10](docs/PHASE10.md), [Phase 11](docs/PHASE11.md). Security boundaries and deferred scope: [AGENTS.md](AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DECISIONS.md](DECISIONS.md), [PROGRESS.md](PROGRESS.md).
