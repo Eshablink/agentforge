@@ -1,0 +1,182 @@
+name: AgentForge Deployment Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - feat/agentforge-phases-9-11
+
+jobs:
+  production-validation:
+    name: Production Images + Smoke Validation
+    runs-on: ubuntu-latest
+
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: agentforge
+          POSTGRES_USER: agentforge
+          POSTGRES_PASSWORD: agentforge
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U agentforge -d agentforge"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      APP_ENV: test
+      DATABASE_URL: postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge
+      LLM_PROVIDER: fake
+      EMBEDDING_PROVIDER: fake
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+
+      - name: Wait for PostgreSQL
+        run: |
+          python - <<'PY'
+          import time
+          import psycopg
+
+          deadline = time.time() + 60
+
+          while time.time() < deadline:
+              try:
+                  with psycopg.connect(
+                      "postgresql://agentforge:agentforge@localhost:5432/agentforge"
+                  ):
+                      print("PostgreSQL is ready")
+                      break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("PostgreSQL did not become ready")
+          PY
+
+      - name: Run Alembic migrations
+        working-directory: backend
+        run: alembic upgrade head
+
+      - name: Run import smoke test
+        working-directory: backend
+        run: python -c "import app.main"
+
+      - name: Build backend production image
+        run: |
+          docker build \
+            -f backend/Dockerfile \
+            -t agentforge-backend:validation \
+            .
+
+      - name: Build frontend production image
+        run: |
+          docker build \
+            -f frontend/Dockerfile.production \
+            -t agentforge-frontend:validation \
+            .
+
+      - name: Verify production images
+        run: |
+          docker image inspect agentforge-backend:validation
+          docker image inspect agentforge-frontend:validation
+
+      - name: Start backend validation container
+        run: |
+          docker run -d \
+            --name agentforge-backend-validation \
+            --network host \
+            -e APP_ENV=test \
+            -e DATABASE_URL="${DATABASE_URL}" \
+            -e LLM_PROVIDER=fake \
+            -e EMBEDDING_PROVIDER=fake \
+            agentforge-backend:validation
+
+      - name: Start frontend validation container
+        run: |
+          docker run -d \
+            --name agentforge-frontend-validation \
+            -p 8080:8080 \
+            agentforge-frontend:validation
+
+      - name: Wait for backend health
+        run: |
+          python - <<'PY'
+          import time
+          import urllib.request
+
+          deadline = time.time() + 60
+
+          while time.time() < deadline:
+              try:
+                  with urllib.request.urlopen(
+                      "http://127.0.0.1:8000/health",
+                      timeout=5,
+                  ) as response:
+                      if response.status == 200:
+                          print("Backend health check passed")
+                          break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("Backend health endpoint did not become ready")
+          PY
+
+      - name: Wait for frontend health
+        run: |
+          python - <<'PY'
+          import time
+          import urllib.request
+
+          deadline = time.time() + 60
+
+          while time.time() < deadline:
+              try:
+                  with urllib.request.urlopen(
+                      "http://127.0.0.1:8080/health",
+                      timeout=5,
+                  ) as response:
+                      if response.status == 200:
+                          print("Frontend health check passed")
+                          break
+              except Exception:
+                  time.sleep(2)
+          else:
+              raise SystemExit("Frontend health endpoint did not become ready")
+          PY
+
+      - name: Run deployment smoke probes
+        env:
+          SMOKE_API_URL: http://127.0.0.1:8000
+          SMOKE_FRONTEND_URL: http://127.0.0.1:8080
+        run: python deploy/smoke.py
+
+      - name: Show backend logs on failure
+        if: failure()
+        run: |
+          docker logs agentforge-backend-validation || true
+
+      - name: Show frontend logs on failure
+        if: failure()
+        run: |
+          docker logs agentforge-frontend-validation || true
+
+      - name: Cleanup validation containers
+        if: always()
+        run: |
+          docker rm -f agentforge-backend-validation || true
+          docker rm -f agentforge-frontend-validation || true
