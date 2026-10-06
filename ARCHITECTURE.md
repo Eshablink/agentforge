@@ -1,27 +1,19 @@
-# AgentForge Architecture
+# AgentForge architecture
 
-**Baseline:** Phases 0–7 COMPLETE on `main`; Phase 7 PR #9 MERGED in `63d7d3f0d417d06b2e57fa63874824de4306450d`, verified by main CI run 37320957004. Phase 8 hardens deployment without changing the owner-aware RAG, typed tools, bounded memory or existing public APIs.
+Phases 0–8 are merged on main (`97934d7dd7f016a4d13f17b2afd4e577024d85a1`). Phases 9–11 live in PR #11; they are implemented on a branch and must be verified on its final HEAD before merging. No production cloud deployment is claimed.
 
-## Serving path
+## AI delivery and safety
 
-The React/Vite build uses an HTTPS `VITE_API_BASE_URL` or same-origin reverse proxy for JSON and authenticated SSE. The TLS-terminating proxy forwards bearer headers only to the API and disables SSE buffering/caching. FastAPI handles authentication and owner checks, then conversation/agent services invoke allowlisted calculator, date, or owner-filtered document-search tools; PostgreSQL + pgvector stores relational/vector data. The application container does not run migrations: a separate one-shot Alembic job upgrades the schema before startup. Failed migrations stop rollout.
+Authenticated `/agent/chat/stream` preserves a single `message_start` with request-ID correlation, typed operational tool events and exactly one successful `message_end` or controlled `error`. OpenAI-compatible final-answer text can be consumed as provider-native deltas after a validated decision; fake decisions emit simulated output, and providers without native support use bounded completed-answer fallback. After meaningful consumption a stream is never retried. Cancelled/error streams do not persist successful messages. Provider payloads and hidden reasoning are never exposed; only registered typed allowlisted tools execute.
 
-## Configuration and dependency gates
+## Deployment architecture
 
-`APP_ENV` is development, test or production. Production requires explicitly injected PostgreSQL+psycopg URL with non-development host/credentials, explicit HTTPS CORS origins, explicit provider choices, and Redis shared limiting. `AUTH_SECRET` was unused by the hashed opaque-token model and has been removed from the example and local compose. No secrets are baked into images or Vite. `/health` is liveness (no external access); `/ready` checks `SELECT 1` and Redis ping when shared limiting is selected, returning a safe 503 on failure. No model calls are made in probes.
+Separate one-shot Alembic migrations precede API replicas; PostgreSQL+pgvector and shared Redis are mandatory for production. `/health` is liveness; `/ready` checks serving dependencies without calling models. The production frontend image serves a built static artifact as non-root; the API image is non-root. Deployment validation CI builds both artifacts and probes API/frontend using local fake providers, never deploys to a cloud account. A trusted HTTPS reverse proxy implements IP authentication/AI limits, stream concurrency, SSE no-buffer/no-store and forwarded header trust; see DEPLOYMENT.md.
 
-## Rate limiting and abuse protection
+## Retrieval and evaluation
 
-Both in-memory sliding window (development/test) and Redis atomic fixed-window implementations satisfy the same `Limiter` protocol. Production cannot select memory; Redis connection failures fail closed. AI limiter keys are authenticated user IDs; registration/login keys are hashes of normalized email addresses. A proxy should additionally impose edge/IP abuse limits because email-only throttling cannot prevent distributed account spraying. Both stores bound window duration; Redis keys expire automatically. Limiters do not persist bearer credentials.
+The database owner predicate applies **before** vector candidate selection. At most `rag_candidate_max` candidates are scored with small lexical overlap and cosine relevance, then deterministically tie-broken, similarity-filtered and duplicate-suppressed. RAG caps context size and sources to the chunks actually included. Empty evidence remains explicit insufficient evidence. Deterministic datasets test source presence, ranking thresholds/duplicates, tools, agent failures and stream lifecycle; reported metrics are case pass rates, not estimates of external-model factual accuracy. Real-world relevance and hallucination risk need separately curated human review.
 
-## Bounded ingestion and maintenance
+## Limits
 
-Extraction stops on byte/page/character thresholds. Ingestion checks estimated chunk count before allocating chunks, and flushes embedding batches within one transaction. On failure the transaction rolls back. `python cleanup_sessions.py` deletes at most 500 expired session records per run; active sessions are retained. Cleanup never runs in application startup or request flow.
-
-## Existing safety contracts
-
-`/agent/chat` remains backward compatible; SSE delivers generated output in bounded chunks, not provider-native tokens. Authenticated stream and conversation owner checks remain, with one request ID in response header, SSE start and telemetry. No arbitrary Python, shell, filesystem, generated SQL, or unrestricted network tools execute. The evaluation suite remains deterministic and free of paid provider calls.
-
-## Operational limitations
-
-This branch has not been deployed. Redis provides shared fixed-window rather than strict sliding-window behavior; managed PostgreSQL/pgvector, Redis and HTTPS termination must be provisioned externally. Reverse proxies must configure trusted forwarded addresses, SSE buffering and timeouts; see DEPLOYMENT.md. SSO/MFA and cloud infrastructure automation are deferred.
+No generated SQL, shell, filesystem or arbitrary code tools; no cross-user retrieval. Deployment requires external TLS/managed services and is not automatic. Native deltas are only final-answer deltas, not tool-decision streaming. No LLM-as-judge or paid CI calls.
