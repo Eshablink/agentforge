@@ -6,11 +6,10 @@ import time
 from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
-
 from app.core.rate_limit import RateLimitExceeded, ai_request_limiter
 from app.core.settings import get_settings
 from app.core.telemetry import record, reset_request_id, set_request_id
@@ -39,7 +38,7 @@ def _stream_service(db: Session) -> StreamAgentService:
 def _owned_conversation(db: Session, user: User, conversation_id: UUID) -> Conversation:
     conversation = db.scalar(select(Conversation).where(Conversation.id == conversation_id, Conversation.user_id == user.id))
     if conversation is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation not found")
+        raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
 
 
@@ -88,9 +87,10 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
         completed = False
         output: list[str] = []
         terminal = False
+        stream = service.stream(payload.question, context=context, user_id=user.id)
         try:
             yield _sse("message_start", {"request_id": request_id, "conversation_id": str(conversation.id) if conversation else None})
-            for name, data in service.stream(payload.question, context=context, user_id=user.id):
+            for name, data in stream:
                 if await request.is_disconnected():
                     record("stream_disconnect", request_id=request_id)
                     break
@@ -111,11 +111,12 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
                             db.rollback()
                             record("stream_persist_failure", request_id=request_id, error_category="storage")
                     break
-            record("stream_route_finish", request_id=request_id, terminal=terminal, success=completed, duration_ms=round((time.monotonic()-started)*1000, 3))
+            record("agent_stream_complete", request_id=request_id, terminal=terminal, success=completed, duration_ms=round((time.monotonic()-started)*1000, 3))
         except asyncio.CancelledError:
-            record("stream_route_finish", request_id=request_id, terminal=False, success=False, error_category="cancelled")
+            record("agent_stream_cancelled", request_id=request_id, terminal=False, success=False, error_category="cancelled")
             raise
         finally:
+            stream.close()
             reset_request_id(token)
 
     return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no", "X-Request-Id": request_id})
