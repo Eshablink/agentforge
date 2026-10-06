@@ -5,7 +5,7 @@ sqlalchemy==2.0.36
 psycopg[binary]==3.2.3
 alembic==1.14.0
 pgvector==0.3.6
-python-multipart==0.0.17
+python-multipart==0.0.32
 pypdf==5.1.0
 openai==1.52.2
 redis==5.2.1
