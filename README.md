@@ -88,7 +88,7 @@ Raw provider frames and hidden reasoning are never exposed through the UI.
 | 11 | Complete | Advanced bounded RAG quality and offline evaluation |
 | 12 | Complete | Product UI/UX overhaul and initial cloud deployment definition |
 | 13 | Complete | Low-cost managed Postgres/Redis deployment path |
-| 14 | Complete | Security scanning, dependency review and supply-chain controls |
+| 14 | Complete | CodeQL, Dependabot and repository security policy |
 
 Phases 0–13 are implemented on the current branch; merge only after the new deployment checks are green. **A real cloud rollout still requires the owner's cloud accounts and production provider credentials.**
 
