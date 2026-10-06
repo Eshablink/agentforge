@@ -6,7 +6,6 @@ import { apiClient, setAccessToken } from "../services/api/client";
 import type {
   AgentChatResponse,
   AppInfo,
-  ConversationSummary,
   DocumentSummary,
   SessionResponse,
   SourceReference,
@@ -690,7 +689,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                                     <li key={item.event + "-" + index}>
                                       <span className="activity-dot"><Icon name="check" /></span>
                                       <span>
-                                        {item.event.replaceAll("_", " ")}
+                                        {item.event.split("_").join(" ")}
                                         {item.tool ? " · " + item.tool : ""}
                                         {item.detail ? " · " + item.detail : ""}
                                       </span>
