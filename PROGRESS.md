@@ -17,6 +17,7 @@
 | 11 | Owner-first retrieval, deterministic reranking and bounded RAG context | PostgreSQL isolation + fixture evaluation |
 | 12 | Premium responsive frontend, deployment IaC and platform-ready port binding | Frontend TypeScript/Vite build + deployment validation |
 | 13 | External managed Postgres/Redis deployment path | URL normalization tests + deployment-contract validation |
+| 14 | Security and supply-chain hardening | CodeQL + dependency review + Dependabot configuration |
 
 ## Phase 13 acceptance
 
@@ -40,3 +41,7 @@ The offline evaluation reports deterministic fixture pass fractions rather than 
 A real cloud rollout still requires the owner's Render, managed-Postgres, Redis and model-provider accounts. Platform free-tier sleep/pause/retention limits can change; verify current provider limits before treating a free deployment as a permanent hosted service.
 
 SSO/MFA, broad multilingual retrieval tuning and automatic rollback orchestration remain deferred.
+
+## Phase 14 acceptance
+
+Repository-level CodeQL, dependency review and Dependabot controls now complement the application security boundary. No production credentials are used by the security workflow.

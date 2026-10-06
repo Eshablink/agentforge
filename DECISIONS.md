@@ -35,3 +35,7 @@ The backend entrypoint reads PORT from the runtime environment with an 8000 defa
 Managed PostgreSQL providers commonly return `postgres://` or `postgresql://` URLs, while AgentForge's SQLAlchemy engine explicitly uses the psycopg driver. Normalize these standard URL forms at the settings boundary to `postgresql+psycopg://`. Provider-specific connection handling stays outside the core database layer.
 
 The deployment runbook recommends a managed provider's TLS connection settings and the Supabase Session Pooler for hosted session-oriented SQLAlchemy/Alembic workloads.
+
+## ADR-030 — Repository-level supply-chain controls
+
+Keep application security and delivery security as separate layers. Phase 14 adds CodeQL for Python and TypeScript/JavaScript, dependency review for pull requests and Dependabot for Python, npm and GitHub Actions updates. The controls use GitHub-native tooling and do not require application code changes or production credentials.

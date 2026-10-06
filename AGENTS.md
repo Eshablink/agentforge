@@ -4,6 +4,8 @@
 
 Preserve PostgreSQL+pgvector, SQL owner-scoped retrieval, PBKDF2 passwords, hashed revocable sessions, bounded conversations, typed allowlisted tools and all Phase 0–8 APIs. Never execute arbitrary code, shell, filesystem or generated SQL from model output. Never expose hidden reasoning, credentials, prompts or private document contents in logs or provider events. Treat model output as untrusted.
 
+**Phase 14:** protect the delivery boundary with CodeQL for Python/TypeScript, dependency review for high-severity introduced vulnerabilities, and Dependabot coverage for pip/npm/GitHub Actions. Do not add secrets to security workflows. Preserve application correctness/deployment gates and do not loosen production fail-closed controls.
+
 **Phase 9:** stream normalized native final-answer deltas only after a validated structured decision. Fake/simulated and completed-answer fallback are explicitly distinct. Never retry after stream consumption, duplicate terminal events, persist cancelled/incomplete exchanges or update the UI after cancellation.
 
 **Phase 10:** maintain one-shot migrations before serving traffic; verify non-root production images and local `/health`, `/ready`, OpenAPI and frontend smoke probes in the separate Deployment Validation workflow. The trusted HTTPS proxy reference is not a deployed edge service. No paid model or real cloud credentials in CI.
