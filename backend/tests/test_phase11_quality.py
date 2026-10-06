@@ -4,6 +4,7 @@ from uuid import uuid4
 from app.services.evidence_ranker import select_evidence
 from app.services.retrieval_service import RetrievedChunk
 from app.services.rag_service import RAGService
+from app.schemas.chat import ChatResponse
 
 
 def row(content, similarity, document=None, index=0):
@@ -36,3 +37,43 @@ def test_rag_context_budget_only_cites_chunks_actually_used(monkeypatch):
     assert len(context) <= 200
     assert used == [first]
     assert second.chunk_id not in context
+
+
+def test_answer_cites_only_evidence_in_bounded_context(monkeypatch):
+    from app.core.settings import Settings
+    monkeypatch.setattr("app.services.rag_service.get_settings", lambda: Settings(rag_max_context_chars=200))
+    first = row("Paris is the capital of France " + "x" * 500, 0.9)
+    second = row("Berlin is the capital of Germany " + "y" * 500, 0.8)
+    class Retrieval:
+        def search(self, question, top_k=None, *, user_id=None):
+            return [first, second]
+    class LLM:
+        def answer(self, question, context):
+            assert "Paris is the capital" in context
+            assert "Berlin" not in context
+            assert len(context) <= 200
+            return "Paris is the capital of France."
+    service = RAGService.__new__(RAGService)
+    service.retrieval = Retrieval()
+    service.llm = LLM()
+    response = service.answer("Capital of France?")
+    assert isinstance(response, ChatResponse)
+    assert [str(source.chunk_id) for source in response.sources] == [first.chunk_id]
+    assert response.retrieved_chunks == 1
+
+
+def test_empty_answer_returns_insufficient_evidence_without_sources():
+    first = row("Evidence exists", 0.9)
+    class Retrieval:
+        def search(self, question, top_k=None, *, user_id=None):
+            return [first]
+    class LLM:
+        def answer(self, question, context):
+            return "  "
+    service = RAGService.__new__(RAGService)
+    service.retrieval = Retrieval()
+    service.llm = LLM()
+    response = service.answer("Something?")
+    assert response.sources == []
+    assert response.retrieved_chunks == 0
+    assert "could not find enough" in response.answer.lower()
