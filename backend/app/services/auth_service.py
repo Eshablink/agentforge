@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from app.core.rate_limit import RateLimitExceeded, RateLimitUnavailable, auth_request_limiter
 from app.core.settings import get_settings
 from app.core.telemetry import record
-from app.db.dependencies import get_db
+from app.db.session import SessionLocal
 from app.models.user import AuthSession, User
 from app.schemas.platform import LoginRequest, RegisterRequest
 
@@ -30,7 +30,14 @@ def _token_hash(token: str) -> str:
 def _hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, _ITERATIONS)
-    return f"pbkdf2_sha256${_ITERATIONS}${base64.urlsafe_b64encode(salt).decode()}${base64.urlsafe_b64encode(digest).decode()}"
+    return (
+        "pbkdf2_sha256$"
+        + str(_ITERATIONS)
+        + "$"
+        + base64.urlsafe_b64encode(salt).decode()
+        + "$"
+        + base64.urlsafe_b64encode(digest).decode()
+    )
 
 
 def _verify_password(password: str, encoded: str) -> bool:
@@ -85,16 +92,21 @@ def login_user(db: Session, payload: LoginRequest) -> tuple[User, str, datetime]
     return user, token, expires
 
 
-def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer), db: Session = Depends(get_db)) -> User:
+def current_user(credentials: HTTPAuthorizationCredentials | None = Depends(_bearer)) -> User:
     if credentials is None:
         raise HTTPException(status_code=401, detail="Authentication required")
-    row = db.scalar(select(AuthSession).where(AuthSession.token_hash == _token_hash(credentials.credentials)))
-    if row is None or row.revoked_at is not None or row.expires_at <= datetime.now(timezone.utc):
-        raise HTTPException(status_code=401, detail="Authentication required")
-    user = db.get(User, row.user_id)
-    if user is None or not user.is_active:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    return user
+    db = SessionLocal()
+    try:
+        row = db.scalar(select(AuthSession).where(AuthSession.token_hash == _token_hash(credentials.credentials)))
+        if row is None or row.revoked_at is not None or row.expires_at <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=401, detail="Authentication required")
+        user = db.get(User, row.user_id)
+        if user is None or not user.is_active:
+            raise HTTPException(status_code=401, detail="Authentication required")
+        db.expunge(user)
+        return user
+    finally:
+        db.close()
 
 
 def logout_user(db: Session, user: User) -> None:
