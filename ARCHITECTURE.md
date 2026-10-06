@@ -8,7 +8,7 @@ Authenticated `/agent/chat/stream` owns exactly one request-ID-correlated `messa
 
 ## Deployment validation (Phase 10)
 
-One-shot Alembic migrations precede serving; PostgreSQL+pgvector and Redis are required for an external production deployment. `/health` has no paid or database calls; `/ready` checks serving dependencies. The separate Deployment Validation workflow builds non-root backend/static frontend production images, runs migration and import smoke, and probes local `/health`, `/ready`, OpenAPI and frontend health using fake providers and test PostgreSQL. The reference HTTPS proxy includes IP/auth/AI and concurrent-stream limits, max body size, trusted forwarding and SSE no-buffer/no-store. Nothing provisions or deploys a real cloud service.
+One-shot Alembic migrations precede serving; PostgreSQL+pgvector and Redis are required for an external production deployment. `/health` has no paid or database calls; `/ready` checks serving dependencies. The separate Deployment Validation workflow builds non-root backend/static frontend production images, exercises PostgreSQL+pgvector and TLS Redis in production mode, rejects fake providers, runs one-shot migration before traffic, and probes health/readiness and smoke endpoints. The reference HTTPS proxy keeps health/readiness outside AI throttling and enforces bounded bodies, trusted forwarding and SSE no-buffer/no-store behavior.
 
 ## Evidence retrieval (Phase 11)
 

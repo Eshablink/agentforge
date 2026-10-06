@@ -1,6 +1,6 @@
 # Phase 10: deployment automation and edge security
 
-Phase 8 is complete and merged. Phase 10 ships a non-root static frontend image and reference HTTPS edge configuration for IP authentication/AI limits, concurrent stream cap, bounded request bodies and unbuffered, non-cacheable SSE. The existing non-root API image and one-shot migration job remain unchanged. The safe `deploy/smoke.py` probes `/health`, `/ready`, `/openapi.json`, and the frontend root without paid provider calls.
+Phase 8 is complete and merged. Phase 10 ships a non-root static frontend image and reference HTTPS edge configuration for IP authentication/AI limits, concurrent stream cap, bounded request bodies and unbuffered, non-cacheable SSE. The existing non-root API image and one-shot migration job remain unchanged. The safe `deploy/smoke.py` probes `/health`, `/ready`, `/openapi.json`, and the frontend root without provider calls. Deployment Validation additionally provisions PostgreSQL+pgvector and TLS Redis in a production-like runtime.
 
 Production requires managed PostgreSQL+pgvector, Redis/TLS, explicit HTTPS origins and injected secrets. The edge proxy configuration is illustrative, not a ready-to-use certificate or cloud deployment. Trust only explicitly configured proxy IPs; never trust all forwarded headers. Validate configuration, back up the DB, run one migration job, gate traffic on readiness and monitor the rollout. Database downgrade and rollback are not automatic.
 

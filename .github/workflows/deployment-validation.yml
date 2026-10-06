@@ -20,8 +20,8 @@ jobs:
       APP_ENV: production
       POSTGRES_DB: agentforge
       POSTGRES_USER: agentforge
-      POSTGRES_PASSWORD: agentforge
-      DATABASE_URL: postgresql+psycopg://agentforge:agentforge@agentforge-postgres:5432/agentforge
+      POSTGRES_PASSWORD: ci-production-password
+      DATABASE_URL: postgresql+psycopg://agentforge:ci-production-password@agentforge-postgres:5432/agentforge
       CORS_ORIGINS: https://app.example
       LLM_PROVIDER: openai
       EMBEDDING_PROVIDER: openai

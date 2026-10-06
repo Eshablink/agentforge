@@ -12,7 +12,7 @@
 
 ## Final verification protocol
 
-On the final HEAD, AgentForge CI must pass PostgreSQL+pgvector Alembic upgrade, import smoke, complete backend pytest (which invokes the deterministic evaluation runner), and TypeScript/Vite production build. Deployment Validation must pass backend and frontend production image builds, migration-before-traffic, backend health/readiness, OpenAPI and frontend smoke probes. The workflows use fake providers and no cloud credentials. Check both workflow results and exact commit SHA on PR #11; historical green checks are not final evidence.
+On the final HEAD, AgentForge CI must pass PostgreSQL+pgvector Alembic upgrade, import smoke, complete backend pytest (which invokes the deterministic evaluation runner), and TypeScript/Vite production build. Deployment Validation must pass backend and frontend production image builds, migration-before-traffic, backend health/readiness, OpenAPI and frontend smoke probes. The standard CI uses fake providers for deterministic tests; Deployment Validation separately exercises production configuration with structurally valid OpenAI provider settings but makes no paid model calls. Check both workflow results and exact commit SHA on PR #11; historical green checks are not final evidence.
 
 ## Quality limitations
 
