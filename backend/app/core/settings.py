@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     max_conversation_context_chars: int = 8000
     rag_top_k_default: int = 5
     rag_top_k_max: int = 10
+    rag_candidate_max: int = 30
+    rag_min_similarity: float = -1.0
+    rag_max_context_chars: int = 6000
     ai_requests_per_minute: int = 20
     auth_attempts_per_minute: int = 10
     max_prompt_chars: int = 5000
@@ -98,6 +101,10 @@ class Settings(BaseSettings):
                   self.max_extracted_chars, self.max_pdf_pages, self.max_document_chunks, self.embedding_batch_size)
         if any(value < 1 for value in limits) or self.embedding_batch_size > 128 or self.max_document_chunks > 5000 or self.max_extracted_chars > 5_000_000:
             raise ValueError("configured resource limits exceed safe bounds")
+        if not (1 <= self.rag_top_k_default <= self.rag_top_k_max <= 10 and self.rag_top_k_max <= self.rag_candidate_max <= 40):
+            raise ValueError("RAG candidate and top-k bounds are invalid")
+        if not -1 <= self.rag_min_similarity <= 1 or not 200 <= self.rag_max_context_chars <= 12000:
+            raise ValueError("RAG similarity or context bounds are invalid")
         if make_url(self.database_url).drivername != "postgresql+psycopg":
             raise ValueError("PostgreSQL with psycopg is required")
         if self.rate_limit_backend == "redis":
