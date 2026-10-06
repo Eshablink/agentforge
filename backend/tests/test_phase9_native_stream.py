@@ -70,6 +70,23 @@ def test_native_delta_adapter_order_and_closes():
     assert frames.closed
 
 
+def test_native_stream_creation_is_not_retried():
+    calls = []
+
+    def create(**kw):
+        calls.append(1)
+        raise RuntimeError("provider timeout during stream creation")
+
+    provider = object.__new__(OpenAIDecisionProvider)
+    provider.model = "offline-test"
+    provider.settings = SimpleNamespace(llm_timeout_seconds=5, llm_max_retries=2)
+    provider.client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+
+    with pytest.raises(NativeStreamFailure):
+        list(native_deltas(provider, DecisionRequest(question="test", step=0)))
+    assert len(calls) == 1
+
+
 def test_native_failure_after_first_delta_never_retries():
     calls = []
     def create(**kw):

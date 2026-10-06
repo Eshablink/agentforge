@@ -31,12 +31,14 @@ def native_deltas(provider: LLMDecisionProvider, request: DecisionRequest) -> It
         )},
     ]
     try:
+        # Do not retry stream creation: a transport timeout can occur after the
+        # provider accepted the request, so replaying it could duplicate work/cost.
         stream = run_bounded(
             lambda: provider.client.chat.completions.create(
                 model=provider.model, temperature=0, stream=True, messages=messages
             ),
             timeout_seconds=provider.settings.llm_timeout_seconds,
-            max_retries=provider.settings.llm_max_retries,
+            max_retries=0,
         )
     except Exception as exc:
         raise NativeStreamFailure("AI provider unavailable") from exc
