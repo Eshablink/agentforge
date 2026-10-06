@@ -95,6 +95,16 @@ export function HomePage({ apiUrl, appInfo }: Props) {
   }, [session]);
 
   useEffect(() => {
+    function handleShortcut(event: globalThis.KeyboardEvent) {
+      if (!session || (!event.metaKey && !event.ctrlKey) || event.key.toLowerCase() !== "k") return;
+      event.preventDefault();
+      void createConversation();
+    }
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [session]);
+
+  useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: busy ? "auto" : "smooth" });
   }, [answer?.answer, busy]);
 
@@ -572,7 +582,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
               </div>
             </div>
             <div className="topbar-actions">
-              <div className="connection-pill"><span className="status-dot" /> Connected</div>
+              <div className="connection-pill"><span className="status-dot" /> Session active</div>
               <button
                 type="button"
                 className="icon-button"
@@ -723,7 +733,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
               <div className="composer-hint">
                 <span><Icon name="spark" /> Agent mode</span>
                 <span>{documents.length} {documentCountLabel} · {conversations.length} {conversationCountLabel}</span>
-                <span className="desktop-only">API: {apiUrl}</span>
+                <span className="desktop-only">Secure session</span>
               </div>
               <form className="composer" onSubmit={sendMessage}>
                 <textarea
