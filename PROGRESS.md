@@ -1,17 +1,19 @@
 # AgentForge progress
 
-**Merged baseline:** Phases 0–8 are complete on main at `97934d7dd7f016a4d13f17b2afd4e577024d85a1` (Phase 8 PR #10). Phases 9, 10 and 11 are implemented and phase-specifically verified on the existing PR #11 branch. They are **not merged or deployed**; final merge remains a human decision.
+**Merged baseline:** Phases 0–8 are complete on `main` at `97934d7dd7f016a4d13f17b2afd4e577024d85a1` (Phase 8 PR #10). Phases 9, 10 and 11 are implemented and verified separately on the existing PR #11 branch. They are **not merged or deployed**; only checks for the final PR HEAD verify the final artifact.
 
 ## Phase acceptance gates
 
-| Phase | Branch implementation | Verification |
+| Phase | Implementation | Evidence and limits |
 |---|---|---|
-| 9 — Native AI streaming | OpenAI-compatible final-answer deltas, deterministic fake and bounded fallback; one terminal event, cancellation-safe frontend | Offline provider-frame and lifecycle tests; full backend/frontend CI passed on the Phase 9 head |
-| 10 — Deployment automation and edge security | Non-root static image, trusted proxy example, migration-before-traffic validation and safe smoke probes | Deployment Validation run 37430440521 and AgentForge CI run 37430440494 passed at `84ce290b1544bd50cae17b62d6fd0998304aad41` |
-| 11 — Advanced RAG + AI quality | SQL owner filtering precedes at-most-40 candidate selection; deterministic relevance/duplicate filtering; bounded context and accurate included-source references | AgentForge CI run 37432213090 and Deployment Validation run 37432213091 passed at `d9eb42eada094bb3fe639288a29e155b3a0667e4`, including owner query-shape fixtures and PostgreSQL owner-isolation tests |
+| 9 — Native AI streaming | Final-answer OpenAI-compatible deltas, offline fake simulation and bounded fallback; one terminal event, cancellation-safe UI | Offline mocked-provider and lifecycle tests; no paid provider calls |
+| 10 — Deployment automation and edge security | Separate non-root frontend image, trusted proxy example, migration-before-traffic validation, safe smoke probes | Deployment Validation builds both images, runs Alembic before serving and probes `/health`, `/ready`, OpenAPI and frontend locally; no real deployment |
+| 11 — Advanced RAG + AI quality | SQL owner filter before bounded pgvector candidates; deterministic relevance ordering, threshold and duplicate suppression; bounded context and only included-source citations | PostgreSQL cross-user tests, SQL predicate tests, context-source regressions, deterministic small fixtures and streaming lifecycle evaluation |
 
-The current branch documentation may advance the HEAD past those runs. **Only checks for the final PR head verify the final artifact.** CI applies Alembic, smoke-imports the app, runs full PostgreSQL-backed pytest and deterministic evaluation, and builds the frontend. Deployment Validation builds both production images and probes local `/health`, `/ready`, API availability and frontend health without paid calls or real cloud credentials.
+## Final verification protocol
 
-## Evaluation and limits
+On the final HEAD, AgentForge CI must pass PostgreSQL+pgvector Alembic upgrade, import smoke, complete backend pytest (which invokes the deterministic evaluation runner), and TypeScript/Vite production build. Deployment Validation must pass backend and frontend production image builds, migration-before-traffic, backend health/readiness, OpenAPI and frontend smoke probes. The workflows use fake providers and no cloud credentials. Check both workflow results and exact commit SHA on PR #11; historical green checks are not final evidence.
 
-The runner reports deterministic fixture pass rates for RAG, tool, agent and stream groups; these metrics are **not** live retrieval accuracy, external-model factuality, or human judgments. The owner-scope fixture compiles a bounded SQL predicate; PostgreSQL integration tests independently verify cross-user isolation. Context provenance does not guarantee every generated claim is true. No production environment has been deployed. Redis, managed PostgreSQL and TLS must be supplied by an operator; SSO/MFA and cloud-account automation remain deferred.
+## Quality limitations
+
+The evaluation runner reports fixture pass rates for RAG, tool, agent and stream groups, not live hit rate, model factual accuracy or an LLM-as-judge score. SQL owner-query fixtures and PostgreSQL integration tests cover distinct isolation boundaries. Bounded context and source provenance do not guarantee that every generated sentence is true. Native deltas are only final-answer text, after structured tool decisions. No cloud production environment has been deployed; Redis/TLS/managed PostgreSQL must be provisioned by an operator. SSO/MFA and general multilingual retrieval tuning remain deferred.
