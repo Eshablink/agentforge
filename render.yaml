@@ -10,6 +10,7 @@ services:
     dockerfilePath: ./backend/Dockerfile
     dockerContext: .
     autoDeployTrigger: checksPass
+    preDeployCommand: alembic -c alembic.ini upgrade head
     healthCheckPath: /ready
     maxShutdownDelaySeconds: 120
     envVars:
@@ -46,7 +47,6 @@ services:
   - type: web
     name: agentforge-web
     runtime: static
-    region: singapore
     buildCommand: npm ci && npm run build
     staticPublishPath: ./frontend/dist
     autoDeployTrigger: checksPass
