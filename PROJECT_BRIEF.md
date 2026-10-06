@@ -1,11 +1,40 @@
 # AgentForge project brief
 
-AgentForge is an authenticated full-stack document-RAG and registered-tool agent. Phases 0–8 are **complete and merged** into main at `97934d7dd7f016a4d13f17b2afd4e577024d85a1`. Phases 9, 10 and 11 are **implemented and CI-verifiable on the existing draft PR #11**, not yet merged or deployed.
+AgentForge is an authenticated full-stack document-RAG and registered-tool agent designed as a portfolio-grade AI engineering system.
 
-| Phase | Implemented capability | What verification establishes |
-|---|---|---|
-| 9 — Native AI streaming | OpenAI-compatible final-answer deltas, offline fake simulation, bounded fallback, controlled single-terminal SSE, cancellation-safe frontend | Mocked provider and stream lifecycle tests; no paid CI |
-| 10 — Deployment automation + edge security | Non-root API/static frontend images, one-shot migration before local traffic, HTTPS edge reference limits and safe smoke probes | Deployment Validation builds both images and checks local migration, health, readiness, OpenAPI and frontend; **not** a cloud rollout |
-| 11 — Advanced RAG + AI quality | Owner-filtered pgvector candidate cap, deterministic reranking/dedup/threshold, context-budget-based citation selection | PostgreSQL owner-isolation tests, context/source tests and small fixture scoring; **not** a guarantee of external-model factual accuracy |
+## Completed scope
 
-Stable hashed sessions, PBKDF2 passwords, typed allowlisted tools, bounded requests, PostgreSQL+pgvector and Phase 0–8 APIs remain. The offline runner reports per-category deterministic fixture pass rates with no paid calls or LLM judge. Current Phase 9–11 completion status must be judged against **both green workflows at the final PR HEAD**, not older run numbers. SSO/MFA, real cloud deployment, multilingual lexical tuning and broad live model-quality scoring are deferred.
+Phases 0–12 are implemented:
+
+- React + TypeScript + Vite product frontend.
+- FastAPI backend.
+- PostgreSQL + pgvector storage and retrieval.
+- PDF/TXT/Markdown ingestion.
+- Multi-user ownership isolation.
+- Opaque bearer sessions and PBKDF2 password hashing.
+- Typed allowlisted tools.
+- Multi-turn conversations.
+- OpenAI-compatible provider abstraction.
+- Native final-answer streaming.
+- Safe stream cancellation and bounded output.
+- Deterministic offline evaluation.
+- Production Docker images.
+- Redis shared rate limiting.
+- Edge/security reference configuration.
+- Deployment validation workflow.
+- Premium responsive UI/UX redesign.
+- Render deployment definition with migration-before-traffic and CI-gated deployment.
+
+## Product objective
+
+The project should feel like a serious AI product at first glance and withstand an engineering review immediately afterwards.
+
+Frontend quality is part of the architecture contract. The interface must make AI behavior understandable without exposing hidden reasoning, preserve explicit source provenance and make loading, streaming, tool activity, cancellation, errors and insufficient evidence easy to understand.
+
+## Deployment objective
+
+The repository defines a repeatable first cloud target. Actual provisioning requires the owner's account and secrets, so the codebase does not claim a live production deployment until those external prerequisites have been completed and verified.
+
+## Deliberately deferred
+
+SSO/MFA, enterprise identity, broad multilingual retrieval tuning, live LLM-as-judge benchmarking, arbitrary coding agents and automatic database rollback orchestration remain outside the current scope.

@@ -7,6 +7,7 @@ on:
       - feat/application-foundation
       - feat/database-rag-foundation
       - feat/agentforge-phases-9-11
+      - feat/phase-12-production-experience
   pull_request:
     branches:
       - main

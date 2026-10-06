@@ -6,7 +6,9 @@ on:
       - main
   push:
     branches:
+      - main
       - feat/agentforge-phases-9-11
+      - feat/phase-12-production-experience
 
 permissions:
   contents: read
@@ -92,6 +94,9 @@ jobs:
 
       - name: Verify frontend lockfile
         run: test -s frontend/package-lock.json
+
+      - name: Validate Render Blueprint YAML
+        run: ruby -e 'require "yaml"; YAML.load_file("render.yaml"); puts "render.yaml YAML syntax OK"'
 
       - name: Verify non-root images
         run: |

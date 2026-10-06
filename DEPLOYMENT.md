@@ -1,15 +1,65 @@
 # AgentForge deployment runbook
 
-Phases 0–8 are COMPLETE and MERGED on main. Phases 9–11 are implemented on PR #11 and deployment-artifact validated only when the **final PR HEAD** has a green `AgentForge Deployment Validation` workflow. **No cloud production deployment has occurred.**
+## Current state
 
-## Operator rollout (not performed by CI)
+AgentForge is production-ready at the application and deployment-definition level, but **no cloud production rollout is claimed by this repository**. The repository contains a Render Blueprint and local Deployment Validation so the operator can perform the rollout with real credentials.
 
-1. Provision managed PostgreSQL+pgvector, Redis over TLS, an HTTPS reverse proxy and injected secrets. Production settings require explicit non-development PostgreSQL credentials, HTTPS CORS origin, provider selection and shared Redis limiting.
-2. Back up data, then run `alembic -c alembic.ini upgrade head` **once** using the backend image before routing traffic. A failed migration stops rollout; rollback of database schema is not automatic or necessarily safe.
-3. Start the unprivileged backend and static frontend images; gate traffic on backend `/ready`. `/health` is cheap liveness; `/ready` checks serving dependencies. The Deployment Validation workflow builds both production images, uses PostgreSQL+pgvector plus a TLS-enabled Redis validation service, runs Alembic once before serving traffic, validates production settings and fake-provider rejection, proves `/ready` fails closed when Redis is unavailable, runs backend/frontend smoke probes and checks Nginx syntax. It does not make paid provider calls or deploy a cloud service.
-4. Configure `deploy/nginx.edge.example.conf` for real domains, certificates and upstreams. Restrict direct API access. Trust only proxy IPs via Uvicorn `--forwarded-allow-ips` (never `*`); enforce edge IP authentication/AI limits, concurrent streams and request body caps. SSE requires `proxy_buffering off`, `proxy_cache off`, `Cache-Control: no-store`, sufficient read timeout and disconnect forwarding. API bearer credentials must never be logged.
-5. Monitor request-ID-correlated, content-free status, readiness, rate-limit and stream lifecycle metrics. Schedule the bounded expired-session cleanup separately; repeat in batches if needed. Image/traffic rollback must be planned by the operator; no automatic rollback is implemented.
+## Recommended first deployment: Render
 
-## Provider, retrieval and evaluation limits
+Render Blueprints can define interconnected services and Postgres in a single render.yaml. The repository's blueprint creates:
 
-OpenAI-compatible native final-answer text deltas are supported after structured decisions; fake and completed-answer fallback modes are explicit. Tool calls remain typed, validated and owner-scoped. PostgreSQL owner predicate applies before a bounded candidate rerank; RAG sources represent included context, not mathematical proof of generated claims. Deterministic CI fixture pass rates do not measure real-world model factuality or retrieval hit rate. The Redis limiter uses a fixed window with boundary bursts, and the edge example is a template rather than a production configuration. No paid provider or real cloud credential is used for CI. SSO/MFA and broad live model-quality benchmarking remain deferred.
+- agentforge-api: Dockerized FastAPI service.
+- agentforge-web: React static site.
+- agentforge-db: PostgreSQL 16 database with pgvector available as a supported extension.
+
+The backend runs Alembic in pre-deploy before serving traffic. Both services use checksPass deploy behavior so the connected deployment can be gated by CI.
+
+### Required secrets
+
+Add these in the agentforge-api service before the first production deploy:
+
+    OPENAI_API_KEY=<real provider credential>
+    REDIS_URL=rediss://<tls-redis-endpoint>
+
+Do not commit these values. REDIS_URL must use TLS because production settings reject non-TLS shared Redis.
+
+### First rollout
+
+1. Connect Eshablink/agentforge to a Render project and select the Blueprint.
+2. Let Render create the API, static site and Postgres resources.
+3. Add the real provider credential and TLS Redis endpoint.
+4. Confirm the generated DATABASE_URL and CORS_ORIGINS wiring.
+5. Verify the pre-deploy migration completes before the API receives traffic.
+6. Check API /health and /ready.
+7. Open the frontend and test registration/login.
+8. Upload a small non-sensitive document and verify indexed retrieval.
+9. Run a tool-assisted prompt and a streaming prompt.
+10. Review application logs and request-ID metadata, then add a custom domain only after the generated deployment is stable.
+
+### Custom domains
+
+The Blueprint automatically wires the platform-generated frontend URL into backend CORS and the backend URL into the frontend build. For a custom frontend domain, update CORS_ORIGINS to the exact HTTPS origin before opening the application through that domain.
+
+Review the edge example in deploy/nginx.edge.example.conf if placing another reverse proxy in front of the application. Never configure wildcard forwarded proxy trust in production.
+
+## Local production-like validation
+
+The GitHub Deployment Validation workflow proves the artifact boundary without making paid model calls. It provisions PostgreSQL+pgvector and TLS Redis, builds the production images, runs the migration once, verifies production provider rejection rules, starts the backend/frontend, checks readiness failure and recovery and runs smoke probes.
+
+The standard AgentForge CI additionally runs the complete pytest suite and frontend production build.
+
+## Rollback
+
+Application rollback should use the hosting platform's previous successful release. Database rollback is not automatic: review migrations and recovery procedures before schema changes. Keep a current database backup for paid production databases.
+
+## Security checklist
+
+- Real production provider credential stored only in the platform secret manager.
+- TLS Redis endpoint configured.
+- Exact HTTPS CORS origin.
+- Direct API access restricted when an edge proxy is used.
+- Trusted forwarded proxy ranges are explicit.
+- Request bodies and stream concurrency remain bounded.
+- Bearer credentials are not written to logs.
+- Health and readiness probes remain outside AI throttling.
+- Demo data contains no personal or secret information.
