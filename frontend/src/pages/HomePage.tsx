@@ -6,6 +6,7 @@ import { apiClient, setAccessToken } from "../services/api/client";
 import type {
   AgentChatResponse,
   AppInfo,
+  ConversationSummary,
   DocumentSummary,
   SessionResponse,
   SourceReference,
