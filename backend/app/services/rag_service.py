@@ -39,18 +39,22 @@ class RAGService:
         return ChatResponse(answer=answer[:4000], sources=sources, retrieved_chunks=len(used))
 
     def _bounded_context(self, chunks):
-        budget = get_settings().rag_max_context_chars
+        settings = get_settings()
+        budget = settings.rag_max_context_chars
         sections = []
         used = []
-        for item in chunks[:get_settings().rag_top_k_max]:
+        used_chars = 0
+        for item in chunks[:settings.rag_top_k_max]:
             prefix = f"[source {len(used) + 1}] {item.filename[:255]} (chunk {item.chunk_index})\n"
-            available = budget - sum(map(len, sections)) - len(prefix) - 2
+            available = budget - used_chars - len(prefix) - 2
             if available < 1:
                 break
             content = item.content[:min(available, 800)]
             if not content:
                 continue
-            sections.append(prefix + content + "\n\n")
+            section = prefix + content + "\n\n"
+            sections.append(section)
+            used_chars += len(section)
             used.append(item)
         return "".join(sections), used
 
