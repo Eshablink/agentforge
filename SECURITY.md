@@ -39,4 +39,4 @@ CI uses fake/test provider credentials and local disposable infrastructure only;
 
 ## Dependency hygiene
 
-Dependabot tracks Python, npm and GitHub Actions dependencies. Pull requests also run dependency review, while CodeQL performs security analysis for Python and TypeScript/JavaScript code.
+Dependabot tracks Python, npm and GitHub Actions dependencies. CodeQL performs security analysis for Python and TypeScript/JavaScript code. GitHub dependency review is documented for later enablement once this repository's dependency graph is enabled.
