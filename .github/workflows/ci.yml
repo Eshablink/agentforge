@@ -8,6 +8,7 @@ on:
       - feat/database-rag-foundation
       - feat/agentforge-phases-9-11
       - feat/phase-12-production-experience
+      - feat/low-cost-cloud-deployment
   pull_request:
     branches:
       - main
