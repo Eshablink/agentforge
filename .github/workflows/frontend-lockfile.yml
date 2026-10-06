@@ -1,0 +1,39 @@
+name: AgentForge Frontend Lockfile
+
+on:
+  push:
+    branches:
+      - feat/agentforge-phases-9-11
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feat/agentforge-phases-9-11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Generate package lock with npm
+        working-directory: frontend
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Commit lockfile when needed
+        run: |
+          if git diff --quiet -- frontend/package-lock.json; then
+            echo "package-lock.json is synchronized"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package-lock.json
+          git commit -m "chore(frontend): sync npm lockfile [skip ci]"
+          git push origin HEAD:feat/agentforge-phases-9-11
