@@ -916,6 +916,16 @@ svg {
   color: var(--warning);
 }
 
+.status-pill.error .status-dot {
+  background: var(--danger);
+  box-shadow: 0 0 0 3px rgba(255, 125, 144, 0.08);
+}
+
+.status-pill.processing .status-dot {
+  background: var(--warning);
+  box-shadow: 0 0 0 3px rgba(255, 201, 107, 0.08);
+}
+
 .status-pill svg {
   width: 11px;
   height: 11px;
