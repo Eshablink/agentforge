@@ -1,21 +1,82 @@
 # AgentForge architecture
 
-Phases 0–8 are COMPLETE and MERGED on main at `97934d7dd7f016a4d13f17b2afd4e577024d85a1`. Phases 9–11 are implemented in PR #11 and require green results for the final branch HEAD before merge. They are not deployed to a production cloud environment.
+AgentForge is an authenticated full-stack document-RAG and registered-tool agent with a React product UI, FastAPI API layer, PostgreSQL+pgvector retrieval, shared Redis rate limiting and OpenAI-compatible model providers.
 
-## Stream delivery (Phase 9)
+## Runtime flow
 
-Authenticated `/agent/chat/stream` owns exactly one request-ID-correlated `message_start`. The structured decision/provider-independent typed allowlisted tool loop remains intact. OpenAI-compatible native final-answer text deltas are normalized into bounded `token` events; fake simulated deltas and completed-answer fallback have explicit mode labels. The route emits one terminal `message_end` or safe `error`, persists only successful owned conversations and closes streams on disconnect. Native deltas are for final answers, not tool decisions. Telemetry contains duration, first-token latency, counts and categories—never answer text, raw provider frames or hidden reasoning.
+    Browser
+      |
+      | HTTPS
+      v
+    Edge / platform proxy
+      |
+      v
+    React + TypeScript + Vite
+      |
+      | REST + SSE
+      v
+    FastAPI
+      |
+      +--> Authentication + opaque sessions
+      +--> Conversations + messages
+      +--> Document ingestion
+      +--> Agent orchestration
+      +--> Registered tools
+      +--> RAG retrieval
+      +--> Stream lifecycle + telemetry
+      |
+      +------------+-------------+
+      |            |             |
+      v            v             v
+    PostgreSQL   Redis       OpenAI-compatible
+    + pgvector   limiter     LLM + embeddings
 
-## Deployment validation (Phase 10)
+## Frontend architecture
 
-One-shot Alembic migrations precede serving; PostgreSQL+pgvector and Redis are required for an external production deployment. `/health` has no paid or database calls; `/ready` checks serving dependencies. The separate Deployment Validation workflow builds non-root backend/static frontend production images, exercises PostgreSQL+pgvector and TLS Redis in production mode, rejects fake providers, runs one-shot migration before traffic, and probes health/readiness and smoke endpoints. The reference HTTPS proxy keeps health/readiness outside AI throttling and enforces bounded bodies, trusted forwarding and SSE no-buffer/no-store behavior.
+The frontend intentionally stays dependency-light. React components consume a typed API client and render the authenticated workspace, conversation history, document knowledge base, source provenance and live stream state.
 
-## Evidence retrieval (Phase 11)
+The UI separates:
 
-The database `Document.user_id` filter applies **before** pgvector candidate ordering and limit. The candidate pool defaults to 30 and cannot exceed 40. Deterministic reranking combines cosine similarity with a small lexical-overlap bonus; non-finite/low similarities are filtered, normalized duplicate text is suppressed, and ties break by similarity, document ID, chunk index and chunk ID. At most 10 chunks become results. RAG packs only text fitting the bounded context budget and returns only sources actually used there; empty retrieval or blank answer returns explicit insufficient evidence. This bounds provenance, not arbitrary external-model factual correctness.
+- Authentication and product positioning.
+- Conversation navigation.
+- Knowledge-base management.
+- Streaming answer rendering.
+- Evidence and activity presentation.
+- Error and insufficient-evidence states.
+- Theme and responsive navigation.
 
-The offline evaluation includes source/grounding fixtures, relevance and deduplication, threshold, SQL owner-predicate shape, valid/invalid tools, bounded agent/provider failures, simulated stream ordering/terminal/error/output-budget cases. Metric values are deterministic per-fixture pass rates rather than live hit rates or hallucination guarantees. PostgreSQL integration tests independently verify cross-user isolation. No SQLite fallback, LLM-as-judge, paid API CI or model-controlled unsafe execution.
+The stream UI exposes normalized lifecycle events only. It never renders raw provider frames or hidden reasoning.
+
+## Retrieval and agent boundaries
+
+Document retrieval applies the owner predicate in SQL before the bounded vector candidate limit. Candidate results receive deterministic relevance scoring, optional thresholding and normalized duplicate suppression. RAG context is capped before provider execution and source references contain only evidence actually included in that context.
+
+Agent execution uses typed allowlisted tools with bounded calls and steps. Arbitrary shell, Python, unrestricted SQL, filesystem operations and unrestricted network access remain outside the platform.
+
+## Production path
+
+Phase 12 adds Render infrastructure-as-code as an operator-friendly deployment target:
+
+- Dockerized API service with platform-provided PORT support.
+- Managed PostgreSQL with pgvector.
+- React static site with CDN delivery.
+- Pre-deploy migration.
+- CI-gated deploy trigger.
+- Service-to-service public URL wiring.
+- Static security headers.
+
+The application still preserves its provider abstraction so a different cloud or compatible OpenAI endpoint can be substituted without changing the product architecture.
+
+## Operational contracts
+
+/health is a cheap liveness endpoint with no database or provider dependency.
+
+/ready validates serving dependencies and fails closed when the production shared limiter is unavailable.
+
+SSE streaming owns a single request-level start, a single terminal event and bounded output. A complete owned exchange is persisted only after successful completion.
+
+Request IDs correlate safe lifecycle telemetry. Telemetry does not contain answer text, raw provider frames or hidden reasoning.
 
 ## Remaining limits
 
-English-oriented lexical overlap and the default permissive similarity threshold need deployment-specific evaluation. HTTPS proxy, Redis and managed database are operator-provisioned; SSO/MFA and broader language-aware retrieval remain deferred. See [DEPLOYMENT.md](DEPLOYMENT.md) for operational rollout and [PROGRESS.md](PROGRESS.md) for exact final-HEAD verification.
+The Render Blueprint is a deployment definition, not proof of a completed cloud rollout. Real credentials, DNS/custom domains, TLS Redis and operator verification are required. Enterprise SSO/MFA, broad live quality benchmarking and automatic rollback orchestration remain deferred.
