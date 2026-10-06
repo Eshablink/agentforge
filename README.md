@@ -1,22 +1,178 @@
 # AgentForge
 
-Phases 0–8 are COMPLETE and MERGED into main (`97934d7dd7f016a4d13f17b2afd4e577024d85a1`). PR #11 implements Phases 9, 10 and 11 on `feat/agentforge-phases-9-11`; these phases are CI-verifiable on the branch but remain **unmerged and not deployed**.
+**A production-style full-stack agentic AI workspace for grounded answers, validated tools, and live streaming.**
 
-## Capabilities
+AgentForge combines a React + TypeScript product UI with a FastAPI service, PostgreSQL + pgvector retrieval, authenticated multi-user conversations, typed registered tools, OpenAI-compatible model integration, native final-answer streaming, bounded evaluation, and deployment automation.
 
-- **Phase 9 — native final-answer deltas:** OpenAI-compatible provider streams normalized answer text after a validated structured decision. The fake is offline/simulated; unsupported providers use bounded fallback. `/agent/chat` remains backward compatible. Exactly one request-level start and one successful end or safe error; cancelled/incomplete streams do not persist successful assistant messages.
-- **Phase 10 — deployment validation and edge safety:** non-root backend and static frontend images; separate one-shot migrations; CI locally builds images, migrates PostgreSQL+pgvector and probes `/health`, `/ready`, OpenAPI and frontend. A reference HTTPS edge config includes IP throttling, stream connection limits, request size and SSE no-buffer/no-cache. No cloud rollout occurs.
-- **Phase 11 — bounded RAG quality:** owner scope is enforced in the SQL candidate query before a small pgvector candidate pool; deterministic lexical/cosine reranking, threshold and duplicate suppression select up to 10 chunks. RAG only lists sources whose content fits the bounded context. Insufficient evidence remains explicit.
+## Why this project stands out
 
-The offline version-controlled evaluation reports deterministic fixture pass rates for RAG, tools, agents and streaming, not live factual accuracy. It runs without paid calls or an LLM judge. PostgreSQL integration tests separately verify owner isolation. Source provenance and prompt constraints do **not** prove an external model cannot hallucinate.
+AgentForge is designed as an **AI engineering system**, not just a chatbot demo.
 
-## Local development and verification
+It demonstrates:
 
-```bash
-cp .env.example .env
-docker compose up --build
-```
+- **Agent orchestration** with explicit, typed decisions and allowlisted tools.
+- **Grounded RAG** with PostgreSQL/pgvector, owner-first filtering, deterministic reranking and bounded evidence.
+- **Production security** with opaque bearer sessions, PBKDF2 password hashing, ownership enforcement and fail-closed production configuration.
+- **Live streaming** with normalized provider deltas, cancellation-safe lifecycle handling and bounded output.
+- **Deployment engineering** with non-root images, migration-before-traffic checks, production smoke validation and an infrastructure-as-code deployment definition.
+- **Product-quality frontend** with responsive navigation, source-aware answers, tool activity, theme support and intentional loading/error states.
 
-Compose is development-only. For CI, see `.github/workflows/ci.yml` and `.github/workflows/deployment-validation.yml`; the exact **final PR HEAD** must have green results in both. AgentForge CI runs Alembic, import smoke, PostgreSQL-backed full pytest (including the evaluation runner) and frontend production build. Deployment Validation builds both images and performs local migration, readiness and smoke validation. See [DEPLOYMENT.md](DEPLOYMENT.md) for operator rollout; **nothing has been deployed to a production account**.
+## Product surface
 
-Phase detail: [Phase 9](docs/PHASE9.md), [Phase 10](docs/PHASE10.md), [Phase 11](docs/PHASE11.md). Security boundaries and deferred scope: [AGENTS.md](AGENTS.md), [ARCHITECTURE.md](ARCHITECTURE.md), [DECISIONS.md](DECISIONS.md), [PROGRESS.md](PROGRESS.md).
+The first screen is a polished authentication experience that explains the product before sign-in. After authentication, the workspace provides:
+
+- Conversation sidebar with create, open and delete.
+- Document knowledge base with upload status and chunk counts.
+- Streaming agent chat with Stop and keyboard-submit controls.
+- Retrieval and tool activity states.
+- Evidence cards showing the actual filename, chunk and similarity used by the response.
+- Explicit insufficient-evidence states.
+- Light and dark themes with persisted preference.
+- Responsive mobile navigation and reduced-motion support.
+
+## Architecture
+
+    Browser
+      │
+      ├── React + TypeScript + Vite
+      │       │
+      │       └── authenticated workspace + SSE streaming UI
+      │
+      ▼
+    HTTPS edge / platform proxy
+      │
+      ▼
+    FastAPI
+      │
+      ├── Auth + opaque sessions
+      ├── Conversations
+      ├── Document ingestion
+      ├── Agent orchestration
+      ├── Registered tools
+      └── Streaming endpoint
+      │
+      ├───────────────┐
+      ▼               ▼
+    PostgreSQL      Redis
+      │               │
+      └── pgvector    └── shared rate limiting
+      │
+      ▼
+    OpenAI-compatible LLM + embeddings
+
+## AI workflow
+
+1. The user submits a bounded prompt.
+2. AgentForge resolves an explicit structured decision.
+3. If needed, it executes only typed, allowlisted tools.
+4. Document search is owner-scoped and candidate-bounded.
+5. Evidence is deterministically reranked and deduplicated.
+6. RAG context is capped before provider execution.
+7. OpenAI-compatible final-answer deltas are normalized into SSE events.
+8. Only the completed owned exchange is persisted.
+
+Raw provider frames and hidden reasoning are never exposed through the UI.
+
+## Engineering milestones
+
+| Phase | Status | Result |
+| --- | --- | --- |
+| 0 | Complete | Engineering contract and architecture |
+| 1 | Complete | FastAPI + React foundation |
+| 2–3 | Complete | PostgreSQL + pgvector RAG and ingestion |
+| 4–6 | Complete | Agent tools, conversations, auth and multi-user isolation |
+| 7 | Complete | Streaming, request IDs and deterministic evaluation |
+| 8 | Complete | Production configuration and shared rate limiting |
+| 9 | Complete | Native final-answer streaming |
+| 10 | Complete | Deployment validation and edge hardening |
+| 11 | Complete | Advanced bounded RAG quality and offline evaluation |
+| 12 | Complete | Product UI/UX overhaul and cloud deployment definition |
+
+Phases 0–12 are implemented on the current mainline. **A real cloud rollout still requires the owner's cloud account and production provider credentials.**
+
+## Technology
+
+**Frontend:** React, TypeScript, Vite, CSS  
+**Backend:** Python, FastAPI, SQLAlchemy, Alembic  
+**Data:** PostgreSQL, pgvector  
+**AI:** OpenAI-compatible chat and embedding providers  
+**Streaming:** Server-Sent Events  
+**Security:** PBKDF2-SHA256, opaque sessions, owner-scoped data access, bounded resources  
+**Deployment:** Docker, Nginx reference edge, Render Blueprint  
+**Quality:** pytest, deterministic offline evaluation, GitHub Actions
+
+## Local development
+
+Create a local environment file from the example and run:
+
+    cp .env.example .env
+    docker compose up --build
+
+The local stack is intended for development. Production settings deliberately reject fake providers, development database credentials, wildcard CORS and non-TLS shared Redis.
+
+## Verification
+
+AgentForge CI covers:
+
+- PostgreSQL + pgvector migration.
+- Backend import smoke test.
+- Full backend pytest suite.
+- Deterministic evaluation runner.
+- TypeScript/Vite production build.
+
+Deployment Validation additionally covers:
+
+- Production backend image build.
+- Non-root image checks.
+- Frontend production image build and lockfile validation.
+- Migration-before-traffic.
+- Production configuration boundaries.
+- Redis TLS readiness and fail-closed behavior.
+- Health/readiness and application smoke probes.
+- Nginx syntax validation.
+
+No paid model calls are required by CI.
+
+## Deployment
+
+The repository includes render.yaml for a repeatable Render deployment definition:
+
+- FastAPI Docker web service.
+- Managed Render Postgres with pgvector support.
+- React static site.
+- Pre-deploy Alembic migration.
+- checksPass deployment trigger.
+- Service-to-service URL wiring.
+- Static-site security headers.
+
+The production application requires:
+
+- A real OpenAI-compatible API key.
+- A TLS Redis endpoint supplied as REDIS_URL.
+- A verified frontend origin.
+- Review of the operator runbook before opening public traffic.
+
+See [docs/PHASE12.md](docs/PHASE12.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## Quality and safety boundaries
+
+The evaluation suite reports deterministic fixture pass rates. It does not claim live retrieval hit rate, external-model factual accuracy or hallucination elimination.
+
+Agent execution is intentionally constrained. The system does not provide arbitrary shell execution, arbitrary Python, unrestricted SQL generation, filesystem automation or unrestricted network access.
+
+## Repository map
+
+    backend/                 FastAPI application
+    frontend/                React + TypeScript client
+    evaluation/              deterministic offline evaluation
+    deploy/                  smoke checks and edge configuration
+    docs/                    phase-specific engineering notes
+    render.yaml              production deployment definition
+    AGENTS.md                permanent engineering contract
+    ARCHITECTURE.md          system architecture
+    DECISIONS.md             accepted design decisions
+    PROGRESS.md               milestone status
+
+---
+
+Built as an end-to-end AI engineering portfolio project with a focus on **correctness, security, observability, deployment discipline and product experience**.
