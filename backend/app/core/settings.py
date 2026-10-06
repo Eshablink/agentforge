@@ -1,12 +1,10 @@
+from __future__ import annotations
+
+from urllib.parse import urlparse
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-from app.core.constants import (
-    EMBEDDING_DIMENSION_DEFAULT,
-    EMBEDDING_MODEL_DEFAULT,
-    LLM_MODEL_DEFAULT,
-    SUPPORTED_EMBEDDING_DIMENSIONS,
-)
+from sqlalchemy.engine import make_url
+from app.core.constants import EMBEDDING_DIMENSION_DEFAULT, EMBEDDING_MODEL_DEFAULT, LLM_MODEL_DEFAULT, SUPPORTED_EMBEDDING_DIMENSIONS
 
 
 class Settings(BaseSettings):
@@ -18,6 +16,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge"
     max_upload_size_bytes: int = 10 * 1024 * 1024
     max_request_body_bytes: int = 64 * 1024
+    max_extracted_chars: int = 2_000_000
+    max_pdf_pages: int = 200
+    max_document_chunks: int = 2500
+    embedding_batch_size: int = 32
     supported_content_types: str = "application/pdf,text/plain,text/markdown"
     chunk_size: int = 800
     chunk_overlap: int = 120
@@ -38,11 +40,20 @@ class Settings(BaseSettings):
     rag_top_k_default: int = 5
     rag_top_k_max: int = 10
     ai_requests_per_minute: int = 20
+    auth_attempts_per_minute: int = 10
     max_prompt_chars: int = 5000
     max_stream_duration_seconds: int = 60
     max_stream_output_chars: int = 12000
+    rate_limit_backend: str = "memory"
+    redis_url: str | None = None
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False, extra="ignore")
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", case_sensitive=False)
+    @field_validator("app_env")
+    @classmethod
+    def valid_environment(cls, value: str) -> str:
+        if value.lower() not in {"development", "test", "production"}:
+            raise ValueError("APP_ENV must be development, test or production")
+        return value.lower()
 
     @field_validator("embedding_provider", "llm_provider")
     @classmethod
@@ -52,11 +63,17 @@ class Settings(BaseSettings):
             raise ValueError("provider must be either 'fake' or 'openai'")
         return provider
 
+    @field_validator("rate_limit_backend")
+    @classmethod
+    def validate_rate_backend(cls, value: str) -> str:
+        if value.lower() not in {"memory", "redis"}:
+            raise ValueError("RATE_LIMIT_BACKEND must be memory or redis")
+        return value.lower()
+
     @field_validator("chunk_overlap")
     @classmethod
     def validate_chunk_overlap(cls, value: int, info) -> int:
-        chunk_size = info.data.get("chunk_size", 0)
-        if value >= chunk_size:
+        if value >= info.data.get("chunk_size", 0):
             raise ValueError("chunk_overlap must be smaller than chunk_size")
         return value
 
@@ -64,28 +81,45 @@ class Settings(BaseSettings):
     @classmethod
     def validate_embedding_dimension(cls, value: int) -> int:
         if value not in SUPPORTED_EMBEDDING_DIMENSIONS:
-            supported = ", ".join(str(item) for item in sorted(SUPPORTED_EMBEDDING_DIMENSIONS))
-            raise ValueError(f"Unsupported embedding_dimension {value}. Supported dimensions: {supported}")
+            raise ValueError("Unsupported embedding dimension")
         return value
 
     @model_validator(mode="after")
     def validate_security_settings(self):
-        production = self.app_env.lower() == "production"
-        if production and self.llm_provider == "openai" and not self.openai_api_key:
-            raise ValueError("OPENAI_API_KEY is required when the production LLM provider is openai")
-        if production and (not self.cors_origin_list or "*" in self.cors_origin_list):
-            raise ValueError("CORS_ORIGINS must contain explicit allowed origins in production")
         if self.session_ttl_seconds < 60 or self.password_min_length < 12:
             raise ValueError("session lifetime and password minimum are below secure defaults")
         if not 1 <= self.max_agent_steps <= 5 or not 1 <= self.max_tool_calls <= 4:
             raise ValueError("agent execution limits exceed safe configured bounds")
-        positive_limits = [self.max_upload_size_bytes, self.max_request_body_bytes, self.max_conversation_messages,
-                           self.max_conversation_context_chars, self.ai_requests_per_minute, self.max_prompt_chars,
-                           self.max_stream_duration_seconds, self.max_stream_output_chars]
-        if any(value < 1 for value in positive_limits):
-            raise ValueError("configured resource limits must be positive")
-        if self.llm_timeout_seconds <= 0 or not 0 <= self.llm_max_retries <= 3:
+        if not 0 <= self.llm_max_retries <= 3 or not 0 < self.llm_timeout_seconds <= 60:
             raise ValueError("provider timeout/retry settings exceed safe bounds")
+        limits = (self.max_upload_size_bytes, self.max_request_body_bytes, self.max_conversation_messages,
+                  self.max_conversation_context_chars, self.ai_requests_per_minute, self.auth_attempts_per_minute,
+                  self.max_prompt_chars, self.max_stream_duration_seconds, self.max_stream_output_chars,
+                  self.max_extracted_chars, self.max_pdf_pages, self.max_document_chunks, self.embedding_batch_size)
+        if any(value < 1 for value in limits) or self.embedding_batch_size > 128 or self.max_document_chunks > 5000 or self.max_extracted_chars > 5_000_000:
+            raise ValueError("configured resource limits exceed safe bounds")
+        if make_url(self.database_url).drivername != "postgresql+psycopg":
+            raise ValueError("PostgreSQL with psycopg is required")
+        if self.rate_limit_backend == "redis":
+            parsed = urlparse(self.redis_url or "")
+            if parsed.scheme not in {"redis", "rediss"} or not parsed.hostname:
+                raise ValueError("REDIS_URL must be a redis:// or rediss:// URL")
+        if self.app_env == "production":
+            explicit = self.model_fields_set
+            if not {"database_url", "cors_origins", "llm_provider", "embedding_provider", "rate_limit_backend"}.issubset(explicit):
+                raise ValueError("production requires explicit database, CORS, provider and rate limiter settings")
+            db = make_url(self.database_url)
+            if not db.host or not db.password or db.password == "agentforge" or db.host in {"localhost", "db", "127.0.0.1"}:
+                raise ValueError("production DATABASE_URL cannot use development credentials or host")
+            if not self.cors_origin_list or any(not origin.startswith("https://") or "*" in origin for origin in self.cors_origin_list):
+                raise ValueError("production CORS_ORIGINS must be explicit HTTPS origins")
+            if self.rate_limit_backend != "redis":
+                raise ValueError("production requires a shared rate limiter")
+            if urlparse(self.redis_url or "").scheme != "rediss":
+                raise ValueError("production REDIS_URL must use TLS (rediss://)")
+            if self.llm_provider == "openai" or self.embedding_provider == "openai":
+                if not self.openai_api_key:
+                    raise ValueError("OPENAI_API_KEY required for selected provider")
         return self
 
     @property

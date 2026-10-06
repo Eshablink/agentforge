@@ -31,11 +31,9 @@ router = APIRouter(tags=["agent", "streaming"])
 def _stream_service(db: Session) -> StreamAgentService:
     retrieval = RetrievalService(db)
     settings = get_settings()
-    provider = (
-        OpenAIDecisionProvider(settings.openai_api_key, settings.llm_model)
-        if settings.llm_provider.lower() == "openai" and settings.openai_api_key
-        else FakeDecisionProvider()
-    )
+    provider = (OpenAIDecisionProvider(settings.openai_api_key, settings.llm_model)
+                if settings.llm_provider.lower() == "openai" and settings.openai_api_key
+                else FakeDecisionProvider())
     return StreamAgentService(provider, ToolRegistry(retrieval))
 
 
@@ -53,12 +51,10 @@ def _memory_context(db: Session, conversation: Conversation) -> str:
 
 
 def _persist_exchange(db: Session, conversation: Conversation, question: str, answer: str, answer_kind: str, tools_used: list[str], sources: list[dict]) -> None:
-    db.add_all([
-        Message(conversation_id=conversation.id, role="user", content=question),
-        Message(conversation_id=conversation.id, role="assistant", content=answer,
-                metadata_json={"answer_kind": answer_kind, "tools_used": tools_used, "sources": sources,
-                               "events": [{"event": "streamed"}]}),
-    ])
+    db.add_all([Message(conversation_id=conversation.id, role="user", content=question),
+                Message(conversation_id=conversation.id, role="assistant", content=answer,
+                        metadata_json={"answer_kind": answer_kind, "tools_used": tools_used, "sources": sources,
+                                       "events": [{"event": "streamed"}]})])
     conversation.updated_at = datetime.now(timezone.utc); db.commit()
 
 
@@ -74,24 +70,20 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
                 raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Request body exceeds maximum allowed size")
         except ValueError as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid Content-Length") from exc
-
     request_id = getattr(request.state, "request_id", None)
     if not request_id:
         raise RuntimeError("Canonical request ID middleware is not installed")
     try:
         ai_request_limiter.check(str(user.id))
     except RateLimitExceeded as exc:
+        record("rate_limit", category="ai")
         raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
-
     conversation = _owned_conversation(db, user, payload.conversation_id) if payload.conversation_id is not None else None
     context = _memory_context(db, conversation) if conversation is not None else ""
     service = _stream_service(db)
     started = time.perf_counter()
 
     async def event_generator():
-        # Set and reset the context in the generator's own execution context.
-        # Agent/provider/tool telemetry emitted during iteration now shares the
-        # same canonical request ID as the HTTP response and SSE start event.
         context_token = set_request_id(request_id)
         completed = False
         try:
@@ -120,7 +112,7 @@ async def agent_chat_stream(payload: AgentChatRequest, request: Request, db: Ses
         finally:
             reset_request_id(context_token)
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "X-Request-Id": request_id})
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no", "X-Request-Id": request_id})
 
 
 def _sse(event: str, data: dict) -> str:

@@ -1,62 +1,24 @@
 # AgentForge
 
-Full-stack document intelligence application: PostgreSQL/pgvector RAG, bounded registered-tool orchestration, persistent per-user conversations, authenticated resource ownership, and (Phase 7) provider reliability, authenticated SSE delivery, safe observability, and deterministic regression evaluation.
+AgentForge provides PostgreSQL/pgvector RAG, typed safe agent tools, authenticated conversations, and incremental SSE delivery. **Phases 0–7 are complete**; Phase 7 PR #9 merged to `main` in `63d7d3f0d417d06b2e57fa63874824de4306450d` with passing main CI. Phase 8 adds production deployment hardening on this branch; this is not a claim that a live environment has been deployed.
 
-## Phase status
+## Phase 8 overview
 
-| Group | Count | Phase | Status |
-|---|---:|---|---|
-| Complete | 1 | Phase 0 — Blueprint | Complete |
-| Complete | 2 | Phase 1 — Application foundation | Complete |
-| Complete | 3 | Phase 2 — PostgreSQL + pgvector | Implemented and verified |
-| Complete | 4 | Phase 3 — Ingestion + grounded RAG | Implemented and verified |
-| Complete | 5 | Phase 4 — Agent workflow and safe tools | Implemented and CI-verified |
-| Complete | 6 | Phase 5 — Persistent conversations and bounded memory | Implemented and CI-verified |
-| Complete | 7 | Phase 6 — Authentication and ownership foundation | Implemented and CI-verified |
-| Complete | 8 | Phase 7 — Reliability, SSE delivery, deterministic regression suite | Implemented; see current PR checks |
-| Deferred | 9 | SSO/MFA, cloud production deployment, distributed rate limiting | Not implemented |
+Production configuration now requires explicit PostgreSQL credentials and host, HTTPS CORS origins, explicit provider selection and Redis-backed rate limiting. `/health` is dependency-free liveness; `/ready` tests PostgreSQL and the shared limiter without paid calls. A one-shot Alembic migration must complete before API startup; runtime replicas do not migrate. The API container runs as a non-root user. The browser uses a configured HTTPS API URL or same-origin proxy (also for SSE).
 
-## Implemented capabilities
+A shared atomic fixed-window limiter protects AI endpoints, while hashed normalized email keys throttle registration/login; shared-store failure blocks expensive/auth calls rather than silently disabling protection. Extraction/page/chunk limits and small embedding batches bound ingestion pressure. Expired sessions can be pruned via explicit bounded maintenance. See [DEPLOYMENT.md](DEPLOYMENT.md) for setup, TLS proxying, migration rollout, probes, SSE buffering and operational limits.
 
-| Group | Count | Capability |
-|---|---:|---|
-| Backend | 1 | FastAPI health, document, RAG chat, auth, agent, conversation, and SSE APIs |
-| Data | 2 | PostgreSQL + pgvector, SQLAlchemy 2.x, Alembic |
-| Ingestion | 3 | PDF/TXT/Markdown extraction, chunking, embeddings, transactional persistence |
-| Retrieval/RAG | 4 | Owner-aware cosine retrieval, grounded context, sources, insufficient-evidence behavior |
-| Agent | 5 | Typed decisions; document search, calculator, date offset; bounded execution/trace |
-| Identity/memory | 6 | PBKDF2 hashes, hashed revocable expiring sessions, owned conversations, bounded context |
-| Reliability | 7 | Per-attempt provider timeout, bounded retries, normalized errors, config-driven selection |
-| Streaming | 8 | Authenticated SSE with typed events; bounded generated answer chunks delivered incrementally to the frontend |
-| Observability | 9 | Single canonical request ID across header, SSE start event and telemetry |
-| Evaluation | 10 | Deterministic version-controlled RAG/tool/agent regression suite; no paid API calls |
-| Frontend | 11 | Registration/login, owned documents, conversations, SSE answer chunks, sources and tool activity |
-
-## Streaming semantics
-
-`POST /agent/chat/stream` sends one `message_start`, followed by safe operational events and bounded answer chunks. The provider currently returns structured decisions/final answer text; the service chunks that generated text for SSE delivery. This is **incremental SSE delivery**, not provider-native token streaming. The existing `/agent/chat` endpoint remains unchanged.
-
-## Local setup
+## Local development
 
 ```bash
 cp .env.example .env
 docker compose up --build
 ```
 
-Compose waits for PostgreSQL health; the backend applies Alembic before serving. Host-based development requires PostgreSQL + pgvector, backend dependencies, and `alembic upgrade head` before starting FastAPI.
+The compose stack is **development only**; its one-shot migration service gates API startup on PostgreSQL health. For tests/CI, use PostgreSQL + pgvector, fake providers, and `pytest` in `backend/`. Full pytest invokes `evaluation/runner/run_evals.py` without paid API calls. Frontend verification is `npm run build` in `frontend/`. Browser `VITE_API_BASE_URL` is optional for same-origin proxying; when set in production it must be an HTTPS URL.
 
-### Deterministic evaluation
+## Security and limits
 
-```bash
-cd backend
-pip install -r requirements.txt
-python ../evaluation/runner/run_evals.py
-```
+Only allowlisted, validated tools execute; there is no arbitrary Python, shell, filesystem, generated SQL or unrestricted network tool. Passwords use salted PBKDF2 and bearer tokens persist only as hashes; owner-scoped retrieval/conversations remain intact. No hidden reasoning, credentials, prompts or raw document contents are logged. Phase 7 SSE is transport-level chunk delivery, not provider-native token generation.
 
-This regression suite checks retrieval/source presence, grounding-related behavior, tool selection and invalid-tool rejection, bounded agent execution, and safe provider failures. It is not a general LLM quality benchmark. It exits non-zero on failure and requires no paid credentials.
-
-## Security and limitations
-
-Only registered, validated tools execute; no arbitrary Python, shell, filesystem, generated SQL, or unrestricted network tool. User-owned documents, conversations, and retrieval remain identity-filtered. Operational traces and SSE frames exclude chain-of-thought and secrets.
-
-Bearer tokens are held in browser memory; reload requires reauthentication. Rate limiting and request-ID context are process-local; multi-worker deployments require a gateway/shared store. Provider timeout is per attempt, so retries can extend total operation duration. SSO/MFA, HTTPS/reverse-proxy operations, cloud deployment, billing, and analytics remain deferred.
+There is no cloud deployment, SSO/MFA or native TLS termination. Redis fixed-window limiting is shared across replicas but needs a provisioned backend; add edge/IP abuse controls for public authentication. Session cleanup is an operator-scheduled command, not a background startup task. See [ARCHITECTURE.md](ARCHITECTURE.md), [PROGRESS.md](PROGRESS.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
