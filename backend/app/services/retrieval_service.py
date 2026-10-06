@@ -20,6 +20,17 @@ class RetrievedChunk:
     similarity: float
 
 
+def _candidate_statement(vector: list[float], user_id: uuid.UUID | None, limit: int) -> Select:
+    """Apply ownership in PostgreSQL *before* candidate limiting/reranking."""
+    distance = DocumentChunk.embedding.cosine_distance(vector)
+    similarity = (1 - distance).label("similarity")
+    return (select(DocumentChunk, Document, similarity)
+            .join(Document, Document.id == DocumentChunk.document_id)
+            .where(Document.user_id.is_(None) if user_id is None else Document.user_id == user_id)
+            .order_by(distance, DocumentChunk.id)
+            .limit(limit))
+
+
 class RetrievalService:
     def __init__(self, db: Session) -> None:
         self.db = db
@@ -30,17 +41,8 @@ class RetrievalService:
         k = top_k if top_k is not None else self.settings.rag_top_k_default
         k = min(max(k, 1), self.settings.rag_top_k_max)
         vector = self.embedding_service.embed_texts([question])[0]
-        distance = DocumentChunk.embedding.cosine_distance(vector)
-        similarity = (1 - distance).label("similarity")
         candidates = min(self.settings.rag_candidate_max, max(k, k * 3))
-        statement: Select = (
-            select(DocumentChunk, Document, similarity)
-            .join(Document, Document.id == DocumentChunk.document_id)
-            .where(Document.user_id.is_(None) if user_id is None else Document.user_id == user_id)
-            .order_by(distance, DocumentChunk.id)
-            .limit(candidates)
-        )
-        rows = self.db.execute(statement).all()
+        rows = self.db.execute(_candidate_statement(vector, user_id, candidates)).all()
         items = [RetrievedChunk(chunk_id=str(chunk.id), document_id=str(document.id),
                                 filename=document.filename, chunk_index=chunk.chunk_index,
                                 content=chunk.content, similarity=float(score))
