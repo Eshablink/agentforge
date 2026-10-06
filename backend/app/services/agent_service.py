@@ -3,7 +3,6 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
-
 from app.core.settings import get_settings
 from app.core.telemetry import record
 from app.schemas.platform import AgentChatResponse, AgentEvent, AgentSource
@@ -46,8 +45,13 @@ class AgentOrchestrationService:
                 record("provider_call", latency_ms=round((time.perf_counter() - provider_started) * 1000, 3), provider=type(self.provider).__name__, success=True)
                 events.append(AgentEvent(event="agent_decision", detail=decision.action))
                 if decision.action in {"answer", "finish"}:
-                    answer = (decision.final_response or "I could not find enough information to answer that.")[:4000]
-                    answer_kind = "DIRECT" if not results else ("RAG_GROUNDED" if "document_search" in tool_names else "TOOL_DERIVED")
+                    searched = "document_search" in tool_names
+                    has_evidence = bool(source_map)
+                    if searched and not has_evidence:
+                        answer, answer_kind = "I could not find enough information in the uploaded documents to answer that.", "INSUFFICIENT_EVIDENCE"
+                    else:
+                        answer = (decision.final_response or "I could not find enough information to answer that.")[:4000]
+                        answer_kind = "DIRECT" if not results else ("RAG_GROUNDED" if searched else "TOOL_DERIVED")
                     finished = True
                     break
                 if decision.action != "tool" or not decision.tool_name:
