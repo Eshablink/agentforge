@@ -217,7 +217,6 @@ export function HomePage({ apiUrl, appInfo }: Props) {
 
     const prompt = question.trim();
     const current = ++generation.current;
-    const conversationAtStart = activeConversation;
 
     setQuestion("");
     setPendingQuestion(prompt);
@@ -225,21 +224,37 @@ export function HomePage({ apiUrl, appInfo }: Props) {
     setError(null);
     setActiveTool(null);
     setActivityOpen(false);
-    setAnswer({
-      answer: "",
-      answer_kind: "INSUFFICIENT_EVIDENCE",
-      sources: [],
-      tools_used: [],
-      events: [],
-      conversation_id: conversationAtStart,
-    });
 
     const controller = new AbortController();
     abortRef.current = controller;
 
+    let conversationAtStart = activeConversation;
     let tokenText = "";
     let completed = false;
     let returnedConversationId: string | null = conversationAtStart;
+
+    try {
+      if (!conversationAtStart) {
+        const conversation = await apiClient.createConversation(
+          prompt.length > 46 ? prompt.slice(0, 46) + "…" : prompt,
+        );
+        conversationAtStart = conversation.id;
+        returnedConversationId = conversation.id;
+        setActiveConversation(conversation.id);
+        setConversations((prev) => [
+          conversation,
+          ...prev.filter((item) => item.id !== conversation.id),
+        ]);
+      }
+
+      setAnswer({
+        answer: "",
+        answer_kind: "INSUFFICIENT_EVIDENCE",
+        sources: [],
+        tools_used: [],
+        events: [],
+        conversation_id: conversationAtStart,
+      });
 
     const onEvent = (eventName: StreamEventName, data: StreamEventData) => {
       if (generation.current !== current || controller.signal.aborted) return;
@@ -287,7 +302,6 @@ export function HomePage({ apiUrl, appInfo }: Props) {
       }
     };
 
-    try {
       await apiClient.streamAgentChat(prompt, conversationAtStart ?? undefined, onEvent, controller.signal);
       if (generation.current !== current || controller.signal.aborted) return;
 
