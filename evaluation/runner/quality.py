@@ -1,8 +1,10 @@
-"""Additional deterministic offline evaluation cases and explainable metrics."""
+"""Deterministic offline evidence, ownership query-shape and stream checks."""
 from __future__ import annotations
 
+import uuid
+from sqlalchemy.dialects import postgresql
 from app.services.evidence_ranker import select_evidence
-from app.services.retrieval_service import RetrievedChunk
+from app.services.retrieval_service import RetrievedChunk, _candidate_statement
 from app.services.agent_provider import FakeDecisionProvider
 from app.services.stream_agent_service import StreamAgentService
 from app.services.tool_registry import ToolRegistry
@@ -12,11 +14,20 @@ def run_ranking(case):
     candidates = [RetrievedChunk(chunk_id=str(index), document_id=item["document_id"], filename=item["filename"],
                                  chunk_index=index, content=item["content"], similarity=item["similarity"])
                   for index, item in enumerate(case["retrieval"])]
-    results = select_evidence(case["question"], candidates, limit=10,
-                              minimum_similarity=case.get("minimum_similarity", -1.0))
-    expect = case["expect"]
-    return (len(results) == expect["count"] and (not results or results[0].filename == expect["first_filename"]),
+    results = select_evidence(case["question"], candidates, limit=10, minimum_similarity=case.get("minimum_similarity", -1.0))
+    expected = case["expect"]
+    return (len(results) == expected["count"] and (not results or results[0].filename == expected["first_filename"]),
             "ranked evidence count or first provenance did not match")
+
+
+def run_owner_scope(case):
+    owner = uuid.UUID(case["expected_owner"]) if case["expected_owner"] else None
+    sql = str(_candidate_statement([0.0] * 1536, owner, 5).compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": True}))
+    if owner is None:
+        valid = "documents.user_id IS NULL" in sql
+    else:
+        valid = "documents.user_id =" in sql and str(owner) in sql
+    return valid and " LIMIT 5" in sql, "owner predicate or candidate cap missing from SQL"
 
 
 def run_stream(case):
@@ -37,7 +48,7 @@ def run_stream(case):
 
 
 def report_metrics(results):
-    groups = {"rag": ("rag", "ranking"), "tool": ("tool", "tool_invalid"), "agent": ("agent",), "stream": ("stream",)}
+    groups = {"rag": ("rag", "ranking", "owner_scope"), "tool": ("tool", "tool_invalid"), "agent": ("agent",), "stream": ("stream",)}
     metrics = {}
     for label, kinds in groups.items():
         selected = [success for kind, success in results if kind in kinds]
