@@ -324,7 +324,6 @@ export function HomePage({ apiUrl, appInfo }: Props) {
         setError((err as Error).message);
       }
     } finally {
-    } finally {
       if (generation.current === current) {
         abortRef.current = null;
         setActiveTool(null);
