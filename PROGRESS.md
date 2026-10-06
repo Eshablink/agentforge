@@ -1,6 +1,6 @@
 # AgentForge progress
 
-**Current mainline:** Phases 0–12 are implemented. Phase 9–11 were merged through PR #11 at merge commit eb9f03d3ef12e747a368ede1e8f394fcdee428cc. Phase 12 adds the production experience layer, deployment definition and portfolio-ready frontend.
+**Current branch:** Phase 13 deployment path is implemented on `feat/low-cost-cloud-deployment`. The branch keeps the production application architecture intact while replacing the bundled Render Postgres resource with external managed Postgres + Redis services.
 
 ## Phase acceptance gates
 
@@ -16,19 +16,27 @@
 | 10 | Production images, edge limits and deployment smoke validation | Backend/frontend image build + smoke workflow |
 | 11 | Owner-first retrieval, deterministic reranking and bounded RAG context | PostgreSQL isolation + fixture evaluation |
 | 12 | Premium responsive frontend, deployment IaC and platform-ready port binding | Frontend TypeScript/Vite build + deployment validation |
+| 13 | External managed Postgres/Redis deployment path | URL normalization tests + deployment-contract validation |
 
-## Phase 12 acceptance
+## Phase 13 acceptance
 
-The frontend now provides a product-quality first impression and preserves the existing contracts rather than replacing them with a new UI dependency stack.
+Phase 13 keeps Render responsible only for the application services and moves durable infrastructure to managed providers:
 
-The Render Blueprint defines a Dockerized API, managed PostgreSQL database, React static site, migration-before-traffic and checksPass auto-deploy behavior. The blueprint intentionally leaves provider and TLS Redis credentials as operator-supplied secrets.
+- `DATABASE_URL` may use the standard `postgres://` or `postgresql://` format returned by managed Postgres providers.
+- AgentForge normalizes those URLs to `postgresql+psycopg://` for SQLAlchemy.
+- Render no longer provisions the application database in `render.yaml`.
+- The API service uses a Render-safe secret `DATABASE_URL` supplied by the operator.
+- Shared Redis remains an explicit TLS `rediss://` secret.
+- The Render Blueprint uses the free API service tier to minimize recurring hosting cost.
 
 ## Verification protocol
 
-Final verification must check the exact main commit currently deployed in GitHub Actions. AgentForge CI covers PostgreSQL+pgvector migrations, import smoke, full pytest, deterministic evaluation and the TypeScript/Vite production build. Deployment Validation covers production image construction, non-root checks, migration-before-traffic, production configuration boundaries, Redis TLS readiness/fail-closed behavior, health/readiness, smoke probes and Nginx syntax.
+Final verification must check the exact branch head used by GitHub Actions. AgentForge CI covers PostgreSQL+pgvector migrations, import smoke, full pytest, deterministic evaluation and the TypeScript/Vite production build. Deployment Validation covers production image construction, non-root checks, managed-Postgres URL normalization, migration-before-traffic, production configuration boundaries, Redis TLS readiness/fail-closed behavior, health/readiness, smoke probes and Nginx syntax.
 
 ## Quality limitations
 
-The offline evaluation reports deterministic fixture pass fractions rather than live retrieval hit rate, model factual accuracy or an LLM-as-judge score. RAG provenance is the provenance of supplied context, not proof of every generated claim. English-oriented lexical overlap and the permissive default similarity floor should be tuned against representative data. A real cloud rollout still requires the owner's platform account, provider credential, TLS Redis endpoint and deployment verification.
+The offline evaluation reports deterministic fixture pass fractions rather than live retrieval hit rate, model factual accuracy or an LLM-as-judge score. RAG provenance is the provenance of supplied context, not proof of every generated claim.
+
+A real cloud rollout still requires the owner's Render, managed-Postgres, Redis and model-provider accounts. Platform free-tier sleep/pause/retention limits can change; verify current provider limits before treating a free deployment as a permanent hosted service.
 
 SSO/MFA, broad multilingual retrieval tuning and automatic rollback orchestration remain deferred.

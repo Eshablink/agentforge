@@ -14,7 +14,7 @@ It demonstrates:
 - **Grounded RAG** with PostgreSQL/pgvector, owner-first filtering, deterministic reranking and bounded evidence.
 - **Production security** with opaque bearer sessions, PBKDF2 password hashing, ownership enforcement and fail-closed production configuration.
 - **Live streaming** with normalized provider deltas, cancellation-safe lifecycle handling and bounded output.
-- **Deployment engineering** with non-root images, migration-before-traffic checks, production smoke validation and an infrastructure-as-code deployment definition.
+- **Deployment engineering** with non-root images, migration-before-traffic checks, production smoke validation and infrastructure-as-code.
 - **Product-quality frontend** with responsive navigation, source-aware answers, tool activity, theme support and intentional loading/error states.
 
 ## Product surface
@@ -86,9 +86,10 @@ Raw provider frames and hidden reasoning are never exposed through the UI.
 | 9 | Complete | Native final-answer streaming |
 | 10 | Complete | Deployment validation and edge hardening |
 | 11 | Complete | Advanced bounded RAG quality and offline evaluation |
-| 12 | Complete | Product UI/UX overhaul and cloud deployment definition |
+| 12 | Complete | Product UI/UX overhaul and initial cloud deployment definition |
+| 13 | Complete | Low-cost managed Postgres/Redis deployment path |
 
-Phases 0–12 are implemented on the current mainline. **A real cloud rollout still requires the owner's cloud account and production provider credentials.**
+Phases 0–13 are implemented on the current branch; merge only after the new deployment checks are green. **A real cloud rollout still requires the owner's cloud accounts and production provider credentials.**
 
 ## Technology
 
@@ -125,6 +126,7 @@ Deployment Validation additionally covers:
 - Production backend image build.
 - Non-root image checks.
 - Frontend production image build and lockfile validation.
+- Managed-Postgres URL compatibility checks.
 - Migration-before-traffic.
 - Production configuration boundaries.
 - Redis TLS readiness and fail-closed behavior.
@@ -135,24 +137,16 @@ No paid model calls are required by CI.
 
 ## Deployment
 
-The repository includes render.yaml for a repeatable Render deployment definition:
+The repository uses a **low-cost managed deployment path**:
 
-- FastAPI Docker web service.
-- Managed Render Postgres with pgvector support.
-- React static site.
-- Pre-deploy Alembic migration.
-- checksPass deployment trigger.
-- Service-to-service URL wiring.
-- Static-site security headers.
+- **Render:** FastAPI Docker service + React static site.
+- **Supabase:** PostgreSQL + pgvector, supplied through `DATABASE_URL`.
+- **Upstash or another TLS Redis-compatible service:** shared rate limiting through `REDIS_URL=rediss://...`.
+- **OpenAI:** real chat and embedding credentials supplied only through the platform secret manager.
 
-The production application requires:
+The Render Blueprint intentionally does **not** provision a second Postgres database. This avoids tying durable application data to the application host and makes the database easy to replace later without changing the application architecture.
 
-- A real OpenAI-compatible API key.
-- A TLS Redis endpoint supplied as REDIS_URL.
-- A verified frontend origin.
-- Review of the operator runbook before opening public traffic.
-
-See [docs/PHASE12.md](docs/PHASE12.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
+See [docs/PHASE13.md](docs/PHASE13.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## Quality and safety boundaries
 
@@ -167,11 +161,11 @@ Agent execution is intentionally constrained. The system does not provide arbitr
     evaluation/              deterministic offline evaluation
     deploy/                  smoke checks and edge configuration
     docs/                    phase-specific engineering notes
-    render.yaml              production deployment definition
+    render.yaml              Render application deployment definition
     AGENTS.md                permanent engineering contract
     ARCHITECTURE.md          system architecture
     DECISIONS.md             accepted design decisions
-    PROGRESS.md               milestone status
+    PROGRESS.md              milestone status
 
 ---
 

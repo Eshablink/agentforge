@@ -9,6 +9,7 @@ on:
       - main
       - feat/agentforge-phases-9-11
       - feat/phase-12-production-experience
+      - feat/low-cost-cloud-deployment
 
 permissions:
   contents: read
@@ -95,8 +96,20 @@ jobs:
       - name: Verify frontend lockfile
         run: test -s frontend/package-lock.json
 
-      - name: Validate Render Blueprint YAML
-        run: ruby -e 'require "yaml"; YAML.load_file("render.yaml"); puts "render.yaml YAML syntax OK"'
+      - name: Validate Render Blueprint contract
+        run: |
+          ruby - <<'RUBY'
+          require "yaml"
+          data = YAML.load_file("render.yaml")
+          services = data.fetch("services")
+          api = services.find { |service| service["name"] == "agentforge-api" }
+          raise "agentforge-api service missing" unless api
+          database = api.fetch("envVars").find { |env| env["key"] == "DATABASE_URL" }
+          raise "DATABASE_URL must be operator-supplied" unless database && database["sync"] == false
+          raise "Render Blueprint must not provision Postgres" if data.key?("databases")
+          raise "API must use free plan for the low-cost deployment path" unless api["plan"] == "free"
+          puts "render.yaml deployment contract OK"
+          RUBY
 
       - name: Verify non-root images
         run: |
@@ -142,6 +155,10 @@ jobs:
           status=$?
           set -e
           test $status -ne 0
+
+      - name: Verify hosted PostgreSQL URL normalization
+        run: |
+          docker run --rm             -e APP_ENV=production             -e DATABASE_URL='postgresql://service:ci-secret@managed.example:5432/agentforge?sslmode=require'             -e CORS_ORIGINS=$CORS_ORIGINS             -e LLM_PROVIDER=openai             -e EMBEDDING_PROVIDER=openai             -e OPENAI_API_KEY=$OPENAI_API_KEY             -e RATE_LIMIT_BACKEND=redis             -e REDIS_URL=$REDIS_URL             -e REDIS_SSL_CA_CERT=$REDIS_SSL_CA_CERT             -v $PWD/.ci/redis/ca.crt:/run/redis/ca.crt:ro             agentforge-backend:validation             python -c "from app.core.settings import Settings; assert Settings().database_url.startswith('postgresql+psycopg://')"
 
       - name: Run one-shot production migration
         run: |
