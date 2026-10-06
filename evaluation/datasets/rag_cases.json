@@ -1,23 +1,7 @@
 [
-  {
-    "id": "rag_grounded_has_source",
-    "kind": "rag",
-    "question": "What does the uploaded evidence say about France?",
-    "retrieval": [{"chunk_id": "c1", "content": "the capital of France is Paris", "document_id": "d1", "filename": "france.txt"}],
-    "expect": {"retrieved": true, "has_source": true, "answer_contains": "the capital of France is Paris", "answer_kind": "RAG_GROUNDED"}
-  },
-  {
-    "id": "rag_empty_is_insufficient",
-    "kind": "rag",
-    "question": "Tell me something not in any document",
-    "retrieval": [],
-    "expect": {"retrieved": false, "answer_kind": "INSUFFICIENT_EVIDENCE"}
-  },
-  {
-    "id": "rag_source_metadata_present",
-    "kind": "rag",
-    "question": "Show provenance from the document",
-    "retrieval": [{"chunk_id": "c2", "content": "the test evidence says grounded result", "document_id": "d1", "filename": "doc.txt"}],
-    "expect": {"retrieved": true, "has_source": true, "has_filename": true, "answer_contains": "the test evidence says grounded result"}
-  }
+  {"id":"rag_grounded_has_source","kind":"rag","question":"What does the uploaded evidence say about France?","retrieval":[{"chunk_id":"c1","content":"the capital of France is Paris","document_id":"d1","filename":"france.txt"}],"expect":{"retrieved":true,"has_source":true,"answer_contains":"the capital of France is Paris","answer_kind":"RAG_GROUNDED"}},
+  {"id":"rag_empty_is_insufficient","kind":"rag","question":"Tell me something not in any document","retrieval":[],"expect":{"retrieved":false,"answer_kind":"INSUFFICIENT_EVIDENCE"}},
+  {"id":"rag_source_metadata_present","kind":"rag","question":"Show provenance from the document","retrieval":[{"chunk_id":"c2","content":"the test evidence says grounded result","document_id":"d1","filename":"doc.txt"}],"expect":{"retrieved":true,"has_source":true,"has_filename":true,"answer_contains":"the test evidence says grounded result"}},
+  {"id":"rag_duplicate_suppression","kind":"ranking","question":"capital France Paris","retrieval":[{"chunk_id":"c1","document_id":"d1","filename":"france.txt","content":"Paris is the capital of France","similarity":0.9},{"chunk_id":"c2","document_id":"d2","filename":"duplicate.txt","content":"  PARIS is the capital of FRANCE ","similarity":0.85},{"chunk_id":"c3","document_id":"d3","filename":"other.txt","content":"Berlin is the capital of Germany","similarity":0.8}],"expect":{"count":2,"first_filename":"france.txt"}},
+  {"id":"rag_relevance_threshold","kind":"ranking","question":"capital France","retrieval":[{"chunk_id":"c1","document_id":"d1","filename":"france.txt","content":"Paris capital France","similarity":0.8},{"chunk_id":"c2","document_id":"d2","filename":"low.txt","content":"unrelated","similarity":0.1}],"minimum_similarity":0.5,"expect":{"count":1,"first_filename":"france.txt"}}
 ]
