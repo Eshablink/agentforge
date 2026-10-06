@@ -1,0 +1,7 @@
+# Phase 10: deployment automation and edge security
+
+Phase 8 is complete and merged. Phase 10 ships a separate non-root static frontend image, a reference HTTPS edge proxy with IP authentication/AI limits, concurrent stream cap, max request body, disabled SSE buffering/cache and explicit read timeout. The existing non-root API image and one-shot migration job remain unchanged. `deploy/smoke.py` checks only `/health`, `/ready`, `/openapi.json` and optional frontend root; no LLM probes or credentials.
+
+Production config requires managed PostgreSQL+pgvector, Redis/TLS, explicit HTTPS origin and externally injected secrets. The edge file is an **example**, not a ready-to-use certificate or automatic cloud deployment. Configure the proxy IP explicitly in Uvicorn forwarded-allow-ips, never `*`, and ensure backend ingress is private. Deploy in order: validate config, backup DB, run migration job once, verify readiness, switch traffic, monitor and roll back image/traffic if needed. Database downgrade is not automatically safe.
+
+CI runs migration/import/pytest/evaluations and a frontend production build. Phase 10 adds offline tests of migration separation and proxy directives. Docker image build and smoke execution must be separately observed in a deployment validation workflow before the artifact acceptance checkbox can be marked complete; do not claim a cloud account or automatic rollback.
