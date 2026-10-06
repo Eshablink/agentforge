@@ -1,17 +1,17 @@
 # AgentForge decisions
 
-Phases 0–8 are merged into main (`97934d7dd7f016a4d13f17b2afd4e577024d85a1`). Prior ADR-001–022 remain accepted; Phase 9–11 add narrow extensions, not a replacement for authentication, PostgreSQL+pgvector, or the typed tool registry.
+Phases 0–8 are merged into main (`97934d7dd7f016a4d13f17b2afd4e577024d85a1`). ADR-001–022 remain accepted: PostgreSQL+pgvector, migrations, hashed auth, owner isolation and typed registered tools are unchanged.
 
-## ADR-023 — Native final-answer deltas only
+## ADR-023 — Native final-answer text deltas
 
-After structured typed tool selection, the OpenAI-compatible adapter emits normalized text deltas; it never exposes provider frames. No retry occurs after stream consumption. Fake simulation and fallback are explicitly distinguished, with one terminal event and no incomplete-message persistence. This does not stream tool decisions, and CI tests the provider with mocked frames rather than paid calls.
+After a structured, validated tool decision, normalize OpenAI-compatible final-answer text deltas. Never expose raw frames or retry after stream consumption. Fake/simulated and completed-answer fallback modes remain explicit; exactly one request start and one safe terminal, and only complete owned exchanges persist. The tool decision itself is not provider-native streamed. CI mocks provider frames without paid calls.
 
-## ADR-024 — Deployment artifact validation without real deployment
+## ADR-024 — Local deployment validation without a cloud rollout
 
-The separate Deployment Validation workflow builds both images, runs Alembic before serving, and probes safe local health, readiness, API and frontend endpoints. The production static image is separate from development Vite. A trusted HTTPS edge example enforces IP/request/stream limits and no SSE buffering or caching. The workflow does not provision cloud resources, inject production credentials or perform automatic rollback.
+The separate Deployment Validation workflow builds both non-root production images, applies Alembic before local serving and probes `/health`, `/ready`, OpenAPI and frontend health. An operator must configure the trusted HTTPS edge; the included example limits IP auth/AI requests, concurrent streams, request size, buffering and cache. The workflow does not provision accounts, deploy, or guarantee an automated rollback.
 
-## ADR-025 — Bounded owner-filtered RAG relevance
+## ADR-025 — Bounded owner-filtered evidence selection
 
-Select up to 30 vector candidates by default (hard cap 40) with the SQL owner predicate applied first. Apply deterministic cosine-plus-small lexical reranking, optional threshold and normalized-text duplicate suppression, then pack only evidence that fits a bounded context. Cite only those used chunks; insufficient evidence stays explicit. Default threshold -1 preserves existing matching behavior. Deterministic fixture pass rates demonstrate regression behavior only; they are not external-model factual accuracy or human relevance measurements.
+PostgreSQL applies the owner predicate before a bounded pgvector candidate limit. Up to 30 candidates by default (maximum 40) undergo a small deterministic cosine-plus-lexical rerank, optional similarity threshold and normalized-text duplicate suppression, with stable tie-breaks. RAG cites only chunks included in a bounded context; no evidence or blank answer yields insufficient evidence. Threshold defaults to -1 for backward compatibility. Tests and deterministic fixture pass rates verify these contracts, not real-world factual accuracy or hallucination prevention.
 
-SSO/MFA, real cloud deployment, distributed traces, non-English lexical tuning and live quality scoring are deferred.
+These three phases are implemented on PR #11 and are **CI-verified only if both workflows pass on its final HEAD**. They are not merged or actually deployed. SSO/MFA, automatic real-cloud rollout, multilingual lexical tuning and live LLM-as-judge scoring are intentionally deferred.
