@@ -99,3 +99,7 @@ Never commit credentials. The repository only contains examples and validation r
 Phase 13 adds a regression test for managed PostgreSQL URL normalization. Deployment Validation also asserts that `render.yaml` contains an operator-supplied `DATABASE_URL` and no bundled Postgres resource.
 
 No cloud account is accessed by CI and no paid model calls are made by CI.
+
+## CI note
+
+The branch workflow includes this deployment contract in the same pull request so the exact head is revalidated before merge.
