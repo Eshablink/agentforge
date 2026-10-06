@@ -17,7 +17,7 @@
 | 11 | Owner-first retrieval, deterministic reranking and bounded RAG context | PostgreSQL isolation + fixture evaluation |
 | 12 | Premium responsive frontend, deployment IaC and platform-ready port binding | Frontend TypeScript/Vite build + deployment validation |
 | 13 | External managed Postgres/Redis deployment path | URL normalization tests + deployment-contract validation |
-| 14 | Security and supply-chain hardening | CodeQL + dependency review + Dependabot configuration |
+| 14 | Security and supply-chain hardening | CodeQL + Dependabot + security policy |
 
 ## Phase 13 acceptance
 
