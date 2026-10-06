@@ -235,6 +235,8 @@ jobs:
             -keyout .ci/nginx/privkey.pem -out .ci/nginx/fullchain.pem \
             -subj "/CN=app.example.invalid" -days 1
           docker run --rm \
+            --add-host backend:127.0.0.1 \
+            --add-host frontend:127.0.0.1 \
             -v $PWD/deploy/nginx.edge.example.conf:/etc/nginx/conf.d/default.conf:ro \
             -v $PWD/.ci/nginx:/etc/tls:ro \
             nginx:1.27-alpine nginx -t
