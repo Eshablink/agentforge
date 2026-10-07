@@ -6,4 +6,4 @@ COPY backend /app
 RUN chown -R agentforge:agentforge /app
 USER agentforge
 EXPOSE 8000
-CMD ["python", "serve.py"]
+CMD ["sh", "-c", "alembic -c alembic.ini upgrade head && exec python serve.py"]
