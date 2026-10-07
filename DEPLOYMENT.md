@@ -30,7 +30,7 @@ Add these in the `agentforge-api` service before the first production deploy:
 
     DATABASE_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres?sslmode=require
     OPENAI_API_KEY=<real provider credential>
-    REDIS_URL=rediss://default:<password>@<upstash-host>:6379
+    REDIS_URL=rediss://default:<password>@<external-redis-host>:6379
 
 Do not commit these values.
 
@@ -42,7 +42,7 @@ Use the Supabase **Session Pooler** endpoint for the database rather than the tr
 2. In Supabase **Connect**, copy the Session Pooler connection string and replace the password. Keep `sslmode=require`.
 3. Create a TLS Redis database and copy its `rediss://` TCP connection URL.
 4. Connect `Eshablink/agentforge` to Render and create the Blueprint from `render.yaml`.
-5. Add `DATABASE_URL`, `OPENAI_API_KEY` and `REDIS_URL` to `agentforge-api`.
+5. Add `DATABASE_URL` and `OPENAI_API_KEY` to `agentforge-api`; the Blueprint wires the existing Render Key Value service into `REDIS_URL`.
 6. Let Render run `alembic -c alembic.ini upgrade head` in the pre-deploy step before traffic.
 7. Verify `/health` and `/ready`.
 8. Open the frontend and test registration/login.
