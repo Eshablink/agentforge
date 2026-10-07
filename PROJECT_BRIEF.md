@@ -25,6 +25,10 @@ Phases 0–12 are implemented:
 - Premium responsive UI/UX redesign.
 - Render deployment definition with migration-before-traffic and CI-gated deployment.
 
+## Founding problem statement
+
+The broader product direction is documented in [PROBLEM_STATEMENT.md](PROBLEM_STATEMENT.md): an **AI employee / autonomous company operator** that turns company requests into completed work across sources, procedures, permitted actions, and verification. The current implementation remains intentionally narrower and bounded; this statement is the north-star problem space, not a claim that every capability is already implemented.
+
 ## Product objective
 
 The project should feel like a serious AI product at first glance and withstand an engineering review immediately afterwards.
