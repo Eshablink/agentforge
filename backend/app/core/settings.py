@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     app_version: str = "0.1.0"
     api_prefix: str = ""
     cors_origins: str = "http://localhost:5173"
+    # Supabase shared pooler (IPv4) requires postgres.<project-ref> as the username.
+    # Keep the password-bearing DATABASE_URL in the platform secret store and only
+    # provide the non-secret project ref here so deployments can self-correct a
+    # common copied-connection-string mistake.
+    supabase_project_ref: str | None = None
     database_url: str = "postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge"
     max_upload_size_bytes: int = 10 * 1024 * 1024
     max_request_body_bytes: int = 64 * 1024
@@ -86,7 +91,9 @@ class Settings(BaseSettings):
         normalized = str(value).strip()
         for prefix in ("postgres://", "postgresql://"):
             if normalized.startswith(prefix):
-                return "postgresql+psycopg://" + normalized.split("://", 1)[1]
+                normalized = "postgresql+psycopg://" + normalized.split("://", 1)[1]
+                break
+
         return normalized
 
     @field_validator("embedding_provider", "llm_provider")
@@ -120,6 +127,20 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_security_settings(self):
+        # Correct a shared Supabase Session Pooler URL that was copied with the
+        # direct-connection username. The password remains untouched.
+        parsed_database = make_url(self.database_url)
+        if (
+            self.supabase_project_ref
+            and parsed_database.host
+            and parsed_database.host.endswith(".pooler.supabase.com")
+            and parsed_database.username == "postgres"
+        ):
+            parsed_database = parsed_database.set(username=f"postgres.{self.supabase_project_ref}")
+            if "sslmode" not in parsed_database.query:
+                parsed_database = parsed_database.update_query_dict({"sslmode": "require"})
+            self.database_url = parsed_database.render_as_string(hide_password=False)
+
         if self.session_ttl_seconds < 60 or self.password_min_length < 12:
             raise ValueError("session lifetime and password minimum are below secure defaults")
         if not 1 <= self.max_agent_steps <= 5 or not 1 <= self.max_tool_calls <= 4:
