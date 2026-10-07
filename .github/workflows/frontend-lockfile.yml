@@ -18,7 +18,7 @@ jobs:
           ref: feat/agentforge-phases-9-11
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: "20"
 
