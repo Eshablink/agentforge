@@ -1,0 +1,594 @@
+/* ========================================================================== */
+/* AgentForge — 2026 visual system v2                                         */
+/* Premium motion, cinematic depth, glass surfaces, responsive polish         */
+/* ========================================================================== */
+
+:root {
+  --af-violet: #a78bfa;
+  --af-violet-2: #7c5cff;
+  --af-blue: #6d9bff;
+  --af-cyan: #69d5ff;
+  --af-lime: #62e9ab;
+  --af-hot: #d18cff;
+  --af-grid: rgba(255,255,255,.035);
+}
+
+body {
+  isolation: isolate;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(32rem 20rem at 8% 18%, rgba(167,139,250,.10), transparent 70%),
+    radial-gradient(30rem 22rem at 88% 12%, rgba(105,155,255,.08), transparent 72%),
+    radial-gradient(34rem 22rem at 56% 92%, rgba(209,140,255,.055), transparent 72%);
+  animation: af-aura-drift 20s ease-in-out infinite alternate;
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .25;
+  background-image:
+    linear-gradient(var(--af-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--af-grid) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: linear-gradient(to bottom, black, transparent 82%);
+}
+
+@keyframes af-aura-drift {
+  0% { transform: translate3d(-1.5%, 0, 0) scale(1); }
+  100% { transform: translate3d(1.5%, -1%, 0) scale(1.035); }
+}
+
+/* ---------- premium surfaces ---------- */
+
+.auth-visual,
+.auth-panel-inner,
+.sidebar,
+.workspace,
+.composer,
+.suggestion-card,
+.capability-card,
+.workflow-panel,
+.documents-card,
+.account-card,
+.activity-panel,
+.source-card {
+  will-change: transform;
+}
+
+.auth-visual {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-visual::after {
+  background:
+    linear-gradient(115deg, transparent 18%, rgba(255,255,255,.06) 46%, transparent 64%),
+    radial-gradient(22rem 14rem at 76% 18%, rgba(167,139,250,.07), transparent 72%);
+  background-size: 180% 180%, auto;
+  animation:
+    af-sheen 12s ease-in-out infinite,
+    af-visual-breathe 8s ease-in-out infinite alternate;
+}
+
+@keyframes af-sheen {
+  0%, 63%, 100% { background-position: 160% 0, 0 0; }
+  78% { background-position: -20% 0, 0 0; }
+}
+
+@keyframes af-visual-breathe {
+  0% { opacity: .35; }
+  100% { opacity: .62; }
+}
+
+.auth-visual .brand-lockup {
+  animation: af-enter .65s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.auth-copy {
+  animation: af-enter .78s .08s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.capability-card {
+  animation: af-enter .72s cubic-bezier(.2,.8,.2,1) both;
+}
+
+.capability-card:nth-child(1) { animation-delay: .15s; }
+.capability-card:nth-child(2) { animation-delay: .22s; }
+.capability-card:nth-child(3) { animation-delay: .29s; }
+
+@keyframes af-enter {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.capability-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  transform: scaleY(.2);
+  transform-origin: center;
+  background: linear-gradient(180deg, var(--af-violet), var(--af-blue));
+  opacity: 0;
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+}
+
+.capability-card:hover::before,
+.capability-card:focus-within::before {
+  opacity: .9;
+  transform: scaleY(1);
+}
+
+.capability-card:hover {
+  transform: translateY(-4px) scale(1.008);
+}
+
+.auth-panel-inner {
+  overflow: hidden;
+}
+
+.auth-panel-inner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(130deg, rgba(255,255,255,.025), transparent 28%),
+    radial-gradient(18rem 12rem at 88% 4%, rgba(105,155,255,.07), transparent 72%);
+}
+
+/* ---------- brand + controls ---------- */
+
+.brand-mark {
+  position: relative;
+  overflow: hidden;
+}
+
+.brand-mark::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background: linear-gradient(110deg, transparent 42%, rgba(255,255,255,.38) 50%, transparent 58%);
+  transform: translateX(-90%) rotate(10deg);
+  animation: af-mark-glint 8s ease-in-out infinite;
+}
+
+@keyframes af-mark-glint {
+  0%, 70%, 100% { transform: translateX(-90%) rotate(10deg); }
+  82% { transform: translateX(90%) rotate(10deg); }
+}
+
+.primary-action {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(115deg, var(--af-violet-2), var(--af-violet) 42%, var(--af-blue));
+  background-size: 160% 160%;
+}
+
+.primary-action::after {
+  content: "";
+  position: absolute;
+  inset: -80% -40%;
+  background: linear-gradient(110deg, transparent 44%, rgba(255,255,255,.24) 50%, transparent 56%);
+  transform: translateX(-60%) rotate(8deg);
+  transition: transform 420ms cubic-bezier(.2,.8,.2,1);
+}
+
+.primary-action:hover::after,
+.primary-action:focus-visible::after {
+  transform: translateX(60%) rotate(8deg);
+}
+
+.primary-action > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- workspace aura ---------- */
+
+.workspace {
+  position: relative;
+}
+
+.workspace::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(26rem 18rem at 50% 0%, rgba(167,139,250,.10), transparent 72%),
+    radial-gradient(18rem 16rem at 18% 76%, rgba(105,155,255,.055), transparent 72%);
+  animation: af-workspace-breathe 10s ease-in-out infinite alternate;
+}
+
+.workspace > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes af-workspace-breathe {
+  from { opacity: .55; transform: translate3d(0,0,0); }
+  to { opacity: .95; transform: translate3d(0,-.4%,0); }
+}
+
+.topbar {
+  box-shadow: 0 1px 0 rgba(255,255,255,.025), 0 18px 50px rgba(0,0,0,.08);
+}
+
+.topbar-actions > * {
+  transition: transform 180ms cubic-bezier(.2,.8,.2,1), border-color 180ms ease, background 180ms ease;
+}
+
+.topbar-actions > *:hover {
+  transform: translateY(-1px);
+}
+
+/* ---------- operator signal rail ---------- */
+
+.operator-rail span {
+  position: relative;
+  overflow: hidden;
+}
+
+.operator-rail span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255,255,255,.07) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: af-chip-sheen 10s ease-in-out infinite;
+}
+
+@keyframes af-chip-sheen {
+  0%, 72%, 100% { transform: translateX(-120%); }
+  84% { transform: translateX(120%); }
+}
+
+/* ---------- welcome hero ---------- */
+
+.welcome-state::before {
+  background:
+    radial-gradient(circle, rgba(126,96,255,.14), transparent 60%),
+    conic-gradient(from 210deg, transparent, rgba(105,155,255,.05), transparent);
+  animation: af-hero-pulse 9s ease-in-out infinite alternate;
+}
+
+@keyframes af-hero-pulse {
+  0% { opacity: .46; transform: translateX(-50%) scale(.96); }
+  100% { opacity: .90; transform: translateX(-50%) scale(1.05); }
+}
+
+.welcome-orb {
+  isolation: isolate;
+  animation:
+    orb-float 5.5s ease-in-out infinite,
+    af-orb-bloom 4s ease-in-out infinite alternate;
+}
+
+.welcome-orb::before {
+  border-color: rgba(167,139,250,.13);
+}
+
+.welcome-orb::after {
+  border-color: rgba(105,155,255,.08);
+}
+
+.welcome-orb svg {
+  position: relative;
+  z-index: 2;
+  filter: drop-shadow(0 0 16px rgba(167,139,250,.35));
+}
+
+@keyframes af-orb-bloom {
+  from {
+    box-shadow:
+      0 26px 90px rgba(103,75,220,.22),
+      inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  to {
+    box-shadow:
+      0 32px 110px rgba(103,75,220,.38),
+      inset 0 1px 0 rgba(255,255,255,.13);
+  }
+}
+
+.welcome-state h2 {
+  text-shadow: 0 12px 48px rgba(0,0,0,.18);
+}
+
+/* ---------- prompt cards ---------- */
+
+.suggestion-card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.suggestion-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(120deg, rgba(167,139,250,.10), transparent 34%),
+    radial-gradient(12rem 10rem at 90% 110%, rgba(105,155,255,.08), transparent 70%);
+  opacity: .55;
+  transition: opacity 220ms ease, transform 300ms ease;
+}
+
+.suggestion-card::after {
+  content: "";
+  position: absolute;
+  inset: auto 12px 0 12px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, var(--af-violet), var(--af-blue), transparent);
+  transform: scaleX(.1);
+  opacity: 0;
+  transition: opacity 180ms ease, transform 260ms cubic-bezier(.2,.8,.2,1);
+}
+
+.suggestion-card:hover::before {
+  opacity: 1;
+  transform: scale(1.04);
+}
+
+.suggestion-card:hover::after,
+.suggestion-card:focus-visible::after {
+  opacity: .8;
+  transform: scaleX(1);
+}
+
+/* ---------- workflow / visible agent states ---------- */
+
+.workflow-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.workflow-panel::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -16%;
+  width: 32%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--af-violet), transparent);
+  animation: af-scan 7s ease-in-out infinite;
+}
+
+@keyframes af-scan {
+  0%, 45%, 100% { left: -16%; opacity: 0; }
+  54% { opacity: 1; }
+  78% { left: 92%; opacity: 0; }
+}
+
+.workflow-step {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform 220ms cubic-bezier(.2,.8,.2,1),
+    border-color 220ms ease,
+    background 220ms ease;
+}
+
+.workflow-step::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 40%, rgba(255,255,255,.045) 50%, transparent 60%);
+  transform: translateX(-120%);
+  transition: transform 420ms ease;
+}
+
+.workflow-step:hover::after {
+  transform: translateX(120%);
+}
+
+.workflow-step:hover {
+  transform: translateY(-3px);
+  border-color: rgba(167,139,250,.28);
+  background: rgba(167,139,250,.035);
+}
+
+/* ---------- live response ---------- */
+
+.live-answer {
+  position: relative;
+}
+
+.live-answer::before {
+  content: "";
+  position: absolute;
+  left: -1.35rem;
+  top: 1.35rem;
+  width: 2px;
+  height: 42px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--af-violet), var(--af-blue), transparent);
+  opacity: .72;
+}
+
+.run-status.is-live {
+  border-color: rgba(167,139,250,.20);
+  box-shadow: 0 0 0 1px rgba(167,139,250,.03), 0 12px 34px rgba(94,70,180,.10);
+}
+
+.run-status.is-live .run-status-indicator {
+  box-shadow: 0 0 0 4px rgba(167,139,250,.09), 0 0 18px rgba(167,139,250,.20);
+  animation: af-live-indicator 1.6s ease-in-out infinite;
+}
+
+@keyframes af-live-indicator {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(.74); opacity: .62; }
+}
+
+.working-pill {
+  animation: af-working-breathe 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes af-working-breathe {
+  from { box-shadow: 0 0 0 rgba(167,139,250,0); }
+  to { box-shadow: 0 0 24px rgba(167,139,250,.08); }
+}
+
+/* ---------- evidence cards ---------- */
+
+.source-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.source-card::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--af-violet), var(--af-blue));
+  transform: scaleY(.28);
+  transform-origin: center;
+  opacity: 0;
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(.2,.8,.2,1);
+}
+
+.source-card:hover::before {
+  opacity: .85;
+  transform: scaleY(1);
+}
+
+/* ---------- composer dock ---------- */
+
+.composer-wrap::before {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: .9rem;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(124,92,255,.10), transparent 72%);
+  filter: blur(20px);
+  pointer-events: none;
+}
+
+.composer::before {
+  background:
+    linear-gradient(90deg, rgba(167,139,250,.28), transparent 36%, rgba(105,155,255,.24));
+  background-size: 180% 100%;
+  animation: af-composer-flow 9s ease-in-out infinite;
+}
+
+@keyframes af-composer-flow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.composer:focus-within {
+  transform: translateY(-1px);
+}
+
+/* ---------- secure / online state ---------- */
+
+.operator-state {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+}
+
+.operator-state-pulse {
+  box-shadow:
+    0 0 0 4px rgba(98,233,171,.08),
+    0 0 0 8px rgba(98,233,171,.025),
+    0 0 18px rgba(98,233,171,.26);
+}
+
+.connection-pill {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.03);
+}
+
+/* ---------- command palette ---------- */
+
+.command-palette {
+  transform-origin: top center;
+}
+
+.command-item {
+  position: relative;
+  overflow: hidden;
+}
+
+.command-item::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(167,139,250,.06), transparent 58%);
+  transform: translateX(-102%);
+  transition: transform 260ms cubic-bezier(.2,.8,.2,1);
+}
+
+.command-item:hover::after {
+  transform: translateX(0);
+}
+
+/* ---------- light theme polish ---------- */
+
+:root[data-theme="light"] body::after {
+  opacity: .16;
+}
+
+:root[data-theme="light"] .capability-card,
+:root[data-theme="light"] .suggestion-card,
+:root[data-theme="light"] .workflow-panel {
+  box-shadow: 0 20px 55px rgba(53,62,92,.08);
+}
+
+:root[data-theme="light"] .live-answer::before {
+  opacity: .58;
+}
+
+/* ---------- responsive motion guards ---------- */
+
+@media (max-width: 720px) {
+  .live-answer::before {
+    left: -.7rem;
+  }
+
+  .composer-wrap::before {
+    left: 6%;
+    right: 6%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .auth-visual::after,
+  .auth-visual .brand-lockup,
+  .auth-copy,
+  .capability-card,
+  .brand-mark::after,
+  .workspace::before,
+  .operator-rail span::after,
+  .welcome-state::before,
+  .welcome-orb,
+  .welcome-orb::before,
+  .welcome-orb::after,
+  .workflow-panel::before,
+  .run-status.is-live .run-status-indicator,
+  .working-pill,
+  .composer::before {
+    animation: none !important;
+  }
+}
