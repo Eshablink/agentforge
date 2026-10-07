@@ -3634,3 +3634,109 @@ body {
     animation: none !important;
   }
 }
+
+
+/* ---------- live execution / trust surface ---------- */
+
+.run-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: .62rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(255,255,255,.032), rgba(255,255,255,.015));
+}
+
+.run-status.is-live {
+  border-color: rgba(167,139,250,.19);
+  background: linear-gradient(135deg, rgba(167,139,250,.07), rgba(82,126,255,.025));
+}
+
+.run-status.is-complete {
+  border-color: rgba(98,233,171,.10);
+}
+
+.run-status-main {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  min-width: 0;
+}
+
+.run-status-indicator {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 0 5px rgba(98,233,171,.065);
+}
+
+.run-status.is-live .run-status-indicator {
+  background: var(--accent);
+  box-shadow: 0 0 0 5px rgba(167,139,250,.07);
+  animation: operator-pulse 1.7s ease-in-out infinite;
+}
+
+.run-status-main > div {
+  display: grid;
+  gap: .15rem;
+  min-width: 0;
+}
+
+.run-status-main strong {
+  color: var(--text-soft);
+  font-size: .59rem;
+  font-weight: 780;
+}
+
+.run-status-main small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: .51rem;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-status-metrics {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  flex: 0 0 auto;
+}
+
+.run-status-metrics span {
+  color: var(--text-muted);
+  font-size: .49rem;
+  white-space: nowrap;
+}
+
+.run-status-metrics b {
+  color: var(--text-soft);
+  font-weight: 780;
+}
+
+@media (max-width: 640px) {
+  .run-status {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: .55rem;
+  }
+
+  .run-status-metrics {
+    width: 100%;
+    justify-content: space-between;
+    padding-top: .5rem;
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-status.is-live .run-status-indicator {
+    animation: none !important;
+  }
+}
