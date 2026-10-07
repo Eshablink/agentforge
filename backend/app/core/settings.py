@@ -56,6 +56,7 @@ class Settings(BaseSettings):
     max_stream_output_chars: int = 12000
     rate_limit_backend: str = "memory"
     redis_url: str | None = None
+    render_key_value_id: str | None = None
     redis_ssl_ca_cert: str | None = None
     forwarded_allow_ips: str = "127.0.0.1"
 
@@ -167,7 +168,8 @@ class Settings(BaseSettings):
             is_render_internal_redis = (
                 redis.scheme == "redis"
                 and redis.hostname is not None
-                and redis.hostname.startswith("red-")
+                and self.render_key_value_id is not None
+                and redis.hostname == self.render_key_value_id
                 and redis.port in {None, 6379}
                 and not redis.username
                 and not redis.password
