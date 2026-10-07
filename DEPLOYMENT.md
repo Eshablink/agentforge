@@ -31,6 +31,7 @@ Add these in the `agentforge-api` service before the first production deploy:
     DATABASE_URL=postgresql://postgres.<project-ref>:<password>@<pooler-host>:5432/postgres?sslmode=require
     OPENAI_API_KEY=<real provider credential>
     REDIS_URL=rediss://default:<password>@<external-redis-host>:6379
+    # Render-native deployments also set RENDER_KEY_VALUE_ID to the existing Key Value resource and receive REDIS_URL via the Blueprint.
 
 Do not commit these values.
 
