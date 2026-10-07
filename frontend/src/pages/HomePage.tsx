@@ -71,6 +71,9 @@ export function HomePage({ apiUrl, appInfo }: Props) {
   const [documentsOpen, setDocumentsOpen] = useState(true);
   const [activityOpen, setActivityOpen] = useState(false);
   const [copiedAnswer, setCopiedAnswer] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
+  const commandInputRef = useRef<HTMLInputElement | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     try {
       return (localStorage.getItem("agentforge-theme") as "dark" | "light") || "dark";
@@ -98,13 +101,24 @@ export function HomePage({ apiUrl, appInfo }: Props) {
 
   useEffect(() => {
     function handleShortcut(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") {
+        setCommandOpen(false);
+        return;
+      }
       if (!session || (!event.metaKey && !event.ctrlKey) || event.key.toLowerCase() !== "k") return;
       event.preventDefault();
-      void createConversation();
+      setCommandQuery("");
+      setCommandOpen(true);
     }
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
   }, [session]);
+
+  useEffect(() => {
+    if (!commandOpen) return;
+    const frame = window.requestAnimationFrame(() => commandInputRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [commandOpen]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: busy ? "auto" : "smooth" });
@@ -183,6 +197,8 @@ export function HomePage({ apiUrl, appInfo }: Props) {
     setError(null);
     setActivityOpen(false);
     setCopiedAnswer(false);
+    setCommandOpen(false);
+    setCommandQuery("");
     setSidebarOpen(false);
     try {
       const conversation = await apiClient.getConversation(id);
@@ -228,6 +244,8 @@ export function HomePage({ apiUrl, appInfo }: Props) {
     setActiveTool(null);
     setActivityOpen(false);
     setCopiedAnswer(false);
+    setCommandOpen(false);
+    setCommandQuery("");
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -380,6 +398,49 @@ export function HomePage({ apiUrl, appInfo }: Props) {
 
   const documentCountLabel = documents.length === 1 ? "document" : "documents";
   const conversationCountLabel = conversations.length === 1 ? "conversation" : "conversations";
+
+  const commandItems = [
+    {
+      id: "new",
+      label: "New conversation",
+      description: "Start a clean task in a new thread",
+      icon: "plus",
+      action: () => { void createConversation(); },
+    },
+    {
+      id: "focus",
+      label: "Focus composer",
+      description: "Jump straight to the task input",
+      icon: "search",
+      action: () => document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus(),
+    },
+    {
+      id: "knowledge",
+      label: "Open knowledge base",
+      description: documents.length + " indexed " + documentCountLabel,
+      icon: "file",
+      action: () => setDocumentsOpen(true),
+    },
+    {
+      id: "theme",
+      label: theme === "dark" ? "Switch to light mode" : "Switch to dark mode",
+      description: "Change the workspace appearance",
+      icon: theme === "dark" ? "sun" : "moon",
+      action: () => setTheme(theme === "dark" ? "light" : "dark"),
+    },
+    {
+      id: "logout",
+      label: "Sign out",
+      description: "End this secure workspace session",
+      icon: "logout",
+      action: () => { void logout(); },
+    },
+  ] as const;
+
+  const normalizedCommandQuery = commandQuery.trim().toLowerCase();
+  const filteredCommandItems = normalizedCommandQuery
+    ? commandItems.filter((item) => (item.label + " " + item.description).toLowerCase().includes(normalizedCommandQuery))
+    : commandItems;
 
   if (!session) {
     return (
@@ -613,6 +674,16 @@ export function HomePage({ apiUrl, appInfo }: Props) {
               </div>
             </div>
             <div className="topbar-actions">
+              <button
+                type="button"
+                className="command-trigger"
+                onClick={() => { setCommandQuery(""); setCommandOpen(true); }}
+                aria-label="Open command palette"
+              >
+                <Icon name="search" />
+                <span>Command</span>
+                <kbd>⌘ K</kbd>
+              </button>
               <div className="operator-state">
                 <span className="operator-state-pulse" />
                 <span>Operator online</span>
@@ -629,6 +700,63 @@ export function HomePage({ apiUrl, appInfo }: Props) {
             </div>
           </header>
 
+          {commandOpen && (
+            <div
+              className="command-backdrop"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.currentTarget === event.target) setCommandOpen(false);
+              }}
+            >
+              <section className="command-palette" role="dialog" aria-modal="true" aria-label="Command palette">
+                <div className="command-search">
+                  <Icon name="search" />
+                  <input
+                    ref={commandInputRef}
+                    value={commandQuery}
+                    onChange={(event) => setCommandQuery(event.target.value)}
+                    placeholder="Search actions…"
+                    aria-label="Search actions"
+                  />
+                  <kbd>ESC</kbd>
+                </div>
+                <div className="command-list">
+                  {filteredCommandItems.length ? (
+                    filteredCommandItems.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="command-item"
+                        onClick={() => {
+                          setCommandOpen(false);
+                          setCommandQuery("");
+                          item.action();
+                        }}
+                      >
+                        <span className="command-item-icon"><Icon name={item.icon} /></span>
+                        <span className="command-item-copy">
+                          <strong>{item.label}</strong>
+                          <small>{item.description}</small>
+                        </span>
+                        {item.id === "new" && <kbd>↵</kbd>}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="command-empty">
+                      <span><Icon name="search" /></span>
+                      <strong>No matching actions</strong>
+                      <small>Try “theme”, “knowledge”, or “composer”.</small>
+                    </div>
+                  )}
+                </div>
+                <div className="command-footer">
+                  <span><kbd>↑↓</kbd> navigate</span>
+                  <span><kbd>Enter</kbd> select</span>
+                  <span><kbd>Esc</kbd> close</span>
+                </div>
+              </section>
+            </div>
+          )}
           <div className="workspace-scroll">
             <div className="operator-rail" aria-label="Agent runtime status">
               <span><strong>Context</strong>{documents.length} source{documents.length === 1 ? "" : "s"}</span>
@@ -640,8 +768,8 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                 <section className="welcome-state">
                   <div className="welcome-orb"><Icon name="spark" /></div>
                   <span className="eyebrow">YOUR AI WORKSPACE</span>
-                  <h2>What are we building today?</h2>
-                  <p>Ask questions about your documents, run a calculation, or explore an agent workflow.</p>
+                  <h2>What should AgentForge take care of?</h2>
+                  <p>Bring a task, a question, or a pile of documents. AgentForge grounds the request, uses permitted tools, and shows the evidence behind its work.</p>
                   <div className="prompt-suggestions">
                     {[
                       ["Summarize my latest document", "file"],
