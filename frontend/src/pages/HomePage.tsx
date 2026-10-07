@@ -70,6 +70,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [documentsOpen, setDocumentsOpen] = useState(true);
   const [activityOpen, setActivityOpen] = useState(false);
+  const [copiedAnswer, setCopiedAnswer] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     try {
       return (localStorage.getItem("agentforge-theme") as "dark" | "light") || "dark";
@@ -168,6 +169,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
       setAnswer(null);
       setPendingQuestion(null);
       setActivityOpen(false);
+      setCopiedAnswer(false);
       setSidebarOpen(false);
     } catch (err) {
       setError((err as Error).message);
@@ -180,6 +182,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
     setPendingQuestion(null);
     setError(null);
     setActivityOpen(false);
+    setCopiedAnswer(false);
     setSidebarOpen(false);
     try {
       const conversation = await apiClient.getConversation(id);
@@ -224,6 +227,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
     setError(null);
     setActiveTool(null);
     setActivityOpen(false);
+    setCopiedAnswer(false);
 
     const controller = new AbortController();
     abortRef.current = controller;
@@ -339,6 +343,18 @@ export function HomePage({ apiUrl, appInfo }: Props) {
     setBusy(false);
     setActiveTool(null);
     setPendingQuestion(null);
+  }
+
+  async function copyAnswer() {
+    const value = answer?.answer?.trim();
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedAnswer(true);
+      window.setTimeout(() => setCopiedAnswer(false), 1600);
+    } catch {
+      setCopiedAnswer(false);
+    }
   }
 
   async function logout() {
@@ -592,12 +608,16 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                 <Icon name="grid" />
               </button>
               <div>
-                <span className="topbar-kicker">AI WORKSPACE</span>
+                <span className="topbar-kicker">AGENTFORGE · OPERATOR WORKSPACE</span>
                 <h1>{activeThread?.title || (activeConversation ? "Conversation" : "New conversation")}</h1>
               </div>
             </div>
             <div className="topbar-actions">
-              <div className="connection-pill"><span className="status-dot" /> Session active</div>
+              <div className="operator-state">
+                <span className="operator-state-pulse" />
+                <span>Operator online</span>
+              </div>
+              <div className="connection-pill"><span className="status-dot" /> Secure session</div>
               <button
                 type="button"
                 className="icon-button"
@@ -610,6 +630,11 @@ export function HomePage({ apiUrl, appInfo }: Props) {
           </header>
 
           <div className="workspace-scroll">
+            <div className="operator-rail" aria-label="Agent runtime status">
+              <span><strong>Context</strong>{documents.length} source{documents.length === 1 ? "" : "s"}</span>
+              <span><strong>Memory</strong>{conversations.length} thread{conversations.length === 1 ? "" : "s"}</span>
+              <span><strong>Execution</strong>bounded + verified</span>
+            </div>
             <div className="chat-wrap">
               {!activeThread?.messages.length && !answer && !pendingQuestion ? (
                 <section className="welcome-state">
@@ -634,6 +659,21 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                     <span><Icon name="check" /> Document grounded</span>
                     <span><Icon name="check" /> Registered tools</span>
                     <span><Icon name="check" /> Live streaming</span>
+                  </div>
+                  <div className="workflow-panel" aria-label="Agent execution workflow">
+                    <div className="workflow-heading">
+                      <span>How AgentForge works</span>
+                      <small>Outcome-oriented runtime</small>
+                    </div>
+                    <div className="workflow-steps">
+                      <div className="workflow-step"><span>01</span><strong>Understand</strong><small>Interpret the request</small></div>
+                      <i>→</i>
+                      <div className="workflow-step"><span>02</span><strong>Ground</strong><small>Use owned evidence</small></div>
+                      <i>→</i>
+                      <div className="workflow-step"><span>03</span><strong>Act</strong><small>Run allowed tools</small></div>
+                      <i>→</i>
+                      <div className="workflow-step"><span>04</span><strong>Verify</strong><small>Return evidence</small></div>
+                    </div>
                   </div>
                 </section>
               ) : (
@@ -692,7 +732,10 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                           {!busy && answer.sources.length > 0 && (
                             <div className="source-section">
                               <div className="source-heading">
-                                <span>Evidence</span>
+                                <div>
+                                  <span>Evidence</span>
+                                  <em>owner-scoped · retrieved</em>
+                                </div>
                                 <small>{answer.sources.length} source{answer.sources.length === 1 ? "" : "s"}</small>
                               </div>
                               <div className="source-grid">
