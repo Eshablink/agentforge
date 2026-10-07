@@ -398,7 +398,6 @@ body::after {
 .workflow-step:hover::after {
   transform: translateX(120%);
 }
-
 .workflow-step:hover {
   transform: translateY(-3px);
   border-color: rgba(167,139,250,.28);
@@ -797,8 +796,7 @@ textarea {
 
 button:focus-visible,
 input:focus-visible,
-textarea:focus-visible {
-  outline: 0;
+textarea:focus-visible {  outline: 0;
   box-shadow:
     0 0 0 2px var(--bg),
     0 0 0 4px rgba(167,139,250,.5);
@@ -852,6 +850,166 @@ textarea:focus-visible {
   .source-card,
   .document-mini,
   .command-item {
+    transition: none !important;
+  }
+}
+
+/* ---------- 2026 product storytelling layer -------------------------------- */
+/* Editorial depth, motion and trust-focused polish. Purely visual. */
+
+.workspace-scroll {
+  background:
+    radial-gradient(circle at 50% 10%, rgba(167,139,250,.055), transparent 32rem),
+    radial-gradient(circle at 92% 54%, rgba(103,232,249,.035), transparent 28rem);
+}
+
+.welcome-state {
+  position: relative;
+  isolation: isolate;
+}
+
+.welcome-state::before {
+  content: "";
+  position: absolute;
+  inset: -6rem -10rem auto;
+  height: 24rem;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 32%, rgba(167,139,250,.10), transparent 42%),
+    radial-gradient(circle at 62% 52%, rgba(105,155,255,.055), transparent 35%);
+  filter: blur(10px);
+}
+
+.welcome-state h2 {
+  text-wrap: balance;
+  letter-spacing: -.035em;
+}
+
+.welcome-state > p {
+  max-width: 48rem;
+  text-wrap: pretty;
+}
+
+.workflow-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.workflow-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto -35%;
+  width: 35%;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(167,139,250,.55), rgba(103,232,249,.30), transparent);
+  box-shadow: 0 0 18px rgba(167,139,250,.14);
+  animation: af-story-sweep 9s ease-in-out infinite;
+}
+
+@keyframes af-story-sweep {
+  0%, 52%, 100% { transform: translateX(0); opacity: 0; }
+  62% { opacity: 1; }
+  86% { transform: translateX(385%); opacity: 0; }
+}
+
+.workflow-step {
+  transition:
+    transform 220ms cubic-bezier(.2,.8,.2,1),
+    border-color 220ms ease,
+    background 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.workflow-step:hover {
+  transform: translateY(-2px);
+}
+
+.workflow-step .step-icon {
+  transition: transform 220ms cubic-bezier(.2,.8,.2,1), box-shadow 220ms ease;
+}
+
+.workflow-step:hover .step-icon {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 5px rgba(167,139,250,.055), 0 10px 24px rgba(27,18,58,.12);
+}
+
+.operator-rail {
+  transition: border-color 220ms ease, box-shadow 220ms ease, background 220ms ease;
+}
+
+.operator-rail:hover {
+  border-color: rgba(167,139,250,.16);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 18px 44px rgba(27,18,58,.08);
+}
+
+.run-status,
+.activity-panel,
+.source-card {
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    0 14px 38px rgba(27,18,58,.07);
+}
+
+.answer-body {
+  position: relative;
+}
+
+.answer-body::before {
+  content: "";
+  position: absolute;
+  left: -.9rem;
+  top: .35rem;
+  bottom: .35rem;
+  width: 2px;
+  border-radius: 99px;
+  background: linear-gradient(180deg, rgba(167,139,250,.65), rgba(103,232,249,.18), transparent);
+  opacity: .75;
+}
+
+.composer {
+  position: relative;
+  overflow: hidden;
+}
+
+.composer::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(115deg, rgba(167,139,250,.22), transparent 32%, rgba(103,232,249,.12), transparent 78%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: .7;
+}
+
+@media (max-width: 720px) {
+  .welcome-state::before {
+    inset: -4rem -6rem auto;
+    height: 20rem;
+  }
+
+  .answer-body::before {
+    left: -.55rem;
+  }
+
+  .workflow-panel::after {
+    animation-duration: 11s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workflow-panel::after {
+    animation: none !important;
+  }
+
+  .workflow-step,
+  .workflow-step .step-icon,
+  .operator-rail {
     transition: none !important;
   }
 }
