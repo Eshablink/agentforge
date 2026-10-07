@@ -83,6 +83,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
   const [copiedAnswer, setCopiedAnswer] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
+  const [selectedCommandIndex, setSelectedCommandIndex] = useState(0);
   const commandInputRef = useRef<HTMLInputElement | null>(null);
   const [theme, setTheme] = useState<"dark" | "light">(() => {
     try {
@@ -452,6 +453,39 @@ export function HomePage({ apiUrl, appInfo }: Props) {
     ? commandItems.filter((item) => (item.label + " " + item.description).toLowerCase().includes(normalizedCommandQuery))
     : commandItems;
 
+  useEffect(() => {
+    setSelectedCommandIndex(0);
+  }, [commandQuery, commandOpen]);
+
+  function runCommandItem(item: (typeof commandItems)[number]) {
+    setCommandOpen(false);
+    setCommandQuery("");
+    setSelectedCommandIndex(0);
+    item.action();
+  }
+
+  function handleCommandKeyDown(event: KeyboardEvent<HTMLInputElement>) {
+    if (!filteredCommandItems.length) return;
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setSelectedCommandIndex((index) => (index + 1) % filteredCommandItems.length);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setSelectedCommandIndex((index) => (index - 1 + filteredCommandItems.length) % filteredCommandItems.length);
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      runCommandItem(filteredCommandItems[selectedCommandIndex]);
+    }
+  }
+
+  function usePromptSuggestion(prompt: string) {
+    setQuestion(prompt);
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLTextAreaElement>(".composer textarea")?.focus();
+    });
+  }
+
   if (!session) {
     return (
       <main className="auth-shell">
@@ -725,23 +759,28 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                     ref={commandInputRef}
                     value={commandQuery}
                     onChange={(event) => setCommandQuery(event.target.value)}
+                    onKeyDown={handleCommandKeyDown}
                     placeholder="Search actions…"
                     aria-label="Search actions"
+                    role="combobox"
+                    aria-expanded="true"
+                    aria-controls="agentforge-command-list"
+                    aria-activedescendant={filteredCommandItems[selectedCommandIndex] ? "command-option-" + filteredCommandItems[selectedCommandIndex].id : undefined}
                   />
                   <kbd>ESC</kbd>
                 </div>
-                <div className="command-list">
+                <div className="command-list" id="agentforge-command-list" role="listbox">
                   {filteredCommandItems.length ? (
-                    filteredCommandItems.map((item) => (
+                    filteredCommandItems.map((item, index) => (
                       <button
                         key={item.id}
+                        id={"command-option-" + item.id}
                         type="button"
-                        className="command-item"
-                        onClick={() => {
-                          setCommandOpen(false);
-                          setCommandQuery("");
-                          item.action();
-                        }}
+                        className={"command-item " + (index === selectedCommandIndex ? "is-selected" : "")}
+                        role="option"
+                        aria-selected={index === selectedCommandIndex}
+                        onMouseEnter={() => setSelectedCommandIndex(index)}
+                        onClick={() => runCommandItem(item)}
                       >
                         <span className="command-item-icon"><Icon name={item.icon} /></span>
                         <span className="command-item-copy">
@@ -793,7 +832,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                       ["What can you help me calculate?", "wand"],
                       ["Find the key risks in my docs", "search"],
                     ].map(([label, icon]) => (
-                      <button key={label} type="button" className="suggestion-card" onClick={() => setQuestion(label)}>
+                      <button key={label} type="button" className="suggestion-card" onClick={() => usePromptSuggestion(label)}>
                         <Icon name={icon as "file" | "wand" | "search"} />
                         <span>{label}</span>
                         <Icon name="arrow" />

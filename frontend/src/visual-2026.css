@@ -538,8 +538,20 @@ body::after {
   transition: transform 260ms cubic-bezier(.2,.8,.2,1);
 }
 
-.command-item:hover::after {
+.command-item:hover::after,
+.command-item.is-selected::after {
   transform: translateX(0);
+}
+
+.command-item.is-selected {
+  border-color: rgba(167,139,250,.18);
+  background: rgba(167,139,250,.065);
+  transform: translateX(2px);
+}
+
+.command-item.is-selected .command-item-icon {
+  color: var(--af-violet);
+  box-shadow: 0 0 0 4px rgba(167,139,250,.06);
 }
 
 /* ---------- light theme polish ---------- */
