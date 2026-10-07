@@ -39,6 +39,8 @@ services:
           type: web
           name: agentforge-web
           envVarKey: RENDER_EXTERNAL_URL
+      - key: RENDER_KEY_VALUE_ID
+        value: red-db34h1l9fdbs739urr8g
       - key: REDIS_URL
         fromService:
           type: keyvalue
