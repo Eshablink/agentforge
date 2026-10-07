@@ -9,6 +9,8 @@
 
 > **A production-oriented full-stack agentic AI workspace for grounded answers, validated tools, durable memory, and live streaming.**
 
+> **Live application:** https://agentforge-web-3rn1.onrender.com — the hosted frontend is deployed from `main`.
+
 AgentForge is an end-to-end AI engineering project built around a simple idea: **agentic behavior should be useful, inspectable, constrained, and deployable**.
 
 It combines a React + TypeScript frontend with a FastAPI backend, PostgreSQL + pgvector retrieval, authenticated multi-user conversations, typed allowlisted tools, OpenAI-compatible providers, Server-Sent Events, deterministic offline evaluation, and production-focused security controls.
