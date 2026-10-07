@@ -163,8 +163,19 @@ class Settings(BaseSettings):
                 raise ValueError("production CORS_ORIGINS must be explicit HTTPS origins")
             if self.rate_limit_backend != "redis":
                 raise ValueError("production requires a shared rate limiter")
-            if urlparse(self.redis_url or "").scheme != "rediss":
-                raise ValueError("production REDIS_URL must use TLS (rediss://)")
+            redis = urlparse(self.redis_url or "")
+            is_render_internal_redis = (
+                redis.scheme == "redis"
+                and redis.hostname is not None
+                and redis.hostname.startswith("red-")
+                and redis.port in {None, 6379}
+                and not redis.username
+                and not redis.password
+            )
+            if redis.scheme != "rediss" and not is_render_internal_redis:
+                raise ValueError(
+                    "production REDIS_URL must use TLS (rediss://), or the private Render Key Value endpoint"
+                )
             if self.llm_provider == "fake" or self.embedding_provider == "fake":
                 raise ValueError("production requires real LLM and embedding providers")
             if self.openai_api_key is None or not self.openai_api_key.strip():
