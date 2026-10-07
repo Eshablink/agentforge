@@ -45,3 +45,26 @@ SSO/MFA, broad multilingual retrieval tuning and automatic rollback orchestratio
 ## Phase 14 acceptance
 
 Repository-level CodeQL, dependency review and Dependabot controls now complement the application security boundary. No production credentials are used by the security workflow.
+
+
+## Phase 15 — 2026 editorial product finish
+
+The latest product milestone is now merged to main and deployed:
+
+- Editorial 2026 workspace composition with stronger typography, whitespace and hierarchy.
+- Cinematic welcome state and runtime constellation.
+- Focused floating composer and calmer conversation/evidence surfaces.
+- Accessible command-palette keyboard navigation with arrow-key selection and Enter execution.
+- Reduced-motion safeguards and responsive mobile composition.
+- No backend or API contract changes.
+
+### Production status
+
+- Frontend: `agentforge-web` is live on Render from the latest main commit.
+- API: existing production service remains live and compatible with the frontend.
+- CI/security/deployment validation for the UI changes completed successfully before merge.
+- The remaining open pull requests are dependency-update PRs; they are intentionally not bulk-merged merely for cosmetic cleanup.
+
+### Repository hygiene
+
+Merged/obsolete UI pull requests have been consolidated or closed. Future feature work should use short-lived branches and merge back to main; GitHub's automatic head-branch deletion should be enabled so merged feature branches do not accumulate.
