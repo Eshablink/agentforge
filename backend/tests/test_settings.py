@@ -29,6 +29,15 @@ def test_settings_content_types_parsing() -> None:
     assert settings.supported_content_type_list == ["text/plain", "application/pdf"]
 
 
+def test_settings_normalize_supabase_pooler_username() -> None:
+    settings = _production(
+        database_url="postgresql+psycopg://postgres:secret@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres",
+        supabase_project_ref="walfvdeurvjhhlxyupln",
+    )
+    assert "postgres.walfvdeurvjhhlxyupln@" in settings.database_url
+    assert "sslmode=require" in settings.database_url
+
+
 def test_settings_normalize_managed_postgres_urls() -> None:
     for source_url in (
         "postgres://service:secret@managed.example:5432/agentforge",
