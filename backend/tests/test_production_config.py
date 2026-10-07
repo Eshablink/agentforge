@@ -32,6 +32,7 @@ def test_production_configuration_requires_explicit_safe_dependencies():
         {"rate_limit_backend": "memory"},
         {"redis_url": None},
         {"redis_url": "redis://redis.example:6379"},
+        {"redis_url": "redis://red-not-render.example:6379"},
         {"llm_provider": "fake"},
         {"embedding_provider": "fake"},
         {"openai_api_key": None},
@@ -48,3 +49,19 @@ def test_test_and_dev_allow_local_fake_providers_but_not_sqlite():
         Settings(database_url="sqlite:///test.sqlite3")
     with pytest.raises(ValidationError):
         Settings(max_document_chunks=6000)
+
+
+def test_production_accepts_private_render_key_value_endpoint() -> None:
+    settings = _production(
+        redis_url="redis://red-db34h1l9fdbs739urr8g:6379",
+        render_key_value_id="red-db34h1l9fdbs739urr8g",
+    )
+    assert settings.redis_url == "redis://red-db34h1l9fdbs739urr8g:6379"
+
+
+def test_production_rejects_unbound_private_redis_endpoint() -> None:
+    with pytest.raises(ValidationError):
+        _production(
+            redis_url="redis://red-db34h1l9fdbs739urr8g:6379",
+            render_key_value_id="red-other-resource",
+        )
