@@ -777,6 +777,13 @@ export function HomePage({ apiUrl, appInfo }: Props) {
               {!activeThread?.messages.length && !answer && !pendingQuestion ? (
                 <section className="welcome-state">
                   <div className="welcome-orb"><Icon name="spark" /></div>
+                  <div className="runtime-constellation" aria-label="Agent runtime flow">
+                    <div className="runtime-constellation-track" aria-hidden="true"><span /><span /><span /></div>
+                    <div className="runtime-constellation-node is-active"><strong>01</strong><span>Understand</span></div>
+                    <div className="runtime-constellation-node"><strong>02</strong><span>Ground</span></div>
+                    <div className="runtime-constellation-node"><strong>03</strong><span>Act</span></div>
+                    <div className="runtime-constellation-node"><strong>04</strong><span>Verify</span></div>
+                  </div>
                   <span className="eyebrow">YOUR AI WORKSPACE</span>
                   <h2>What should AgentForge take care of?</h2>
                   <p>Bring a task, a question, or a pile of documents. AgentForge grounds the request, uses permitted tools, and shows the evidence behind its work.</p>
