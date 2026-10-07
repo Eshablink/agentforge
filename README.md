@@ -17,6 +17,12 @@ It combines a React + TypeScript frontend with a FastAPI backend, PostgreSQL + p
 
 ---
 
+## 🎯 Founding problem
+
+AgentForge is part of a broader direction toward an **AI employee / autonomous company operator**: turning company requests into completed work across information sources, procedures, permitted actions, and verification.
+
+The full founding problem statement is documented in [PROBLEM_STATEMENT.md](PROBLEM_STATEMENT.md). The current implementation deliberately represents a bounded foundation rather than claiming the broader autonomous surface is already complete.
+
 ## ✨ Why AgentForge stands out
 
 | Capability | What it demonstrates |
