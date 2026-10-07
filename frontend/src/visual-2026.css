@@ -592,3 +592,266 @@ body::after {
     animation: none !important;
   }
 }
+
+
+/* ---------- 2026 runtime constellation ----------------------------------- */
+/* Inspired by the MagicPath "operator workspace" concept: show the agent's */
+/* bounded lifecycle as a calm, always-visible visual signal.                */
+
+.runtime-constellation {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  width: min(680px, 92vw);
+  margin: -0.25rem auto 1.15rem;
+  padding: 0.7rem 0.55rem 0.15rem;
+  border: 1px solid rgba(167,139,250,.11);
+  border-radius: 18px;
+  background:
+    linear-gradient(135deg, rgba(167,139,250,.075), rgba(105,155,255,.028) 52%, rgba(103,232,249,.045)),
+    rgba(11,14,22,.5);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.055),
+    0 16px 45px rgba(22,15,48,.08);
+  backdrop-filter: blur(18px);
+}
+
+:root[data-theme="light"] .runtime-constellation {
+  border-color: rgba(92,65,199,.12);
+  background:
+    linear-gradient(135deg, rgba(109,81,220,.065), rgba(14,165,233,.035)),
+    rgba(255,255,255,.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.82),
+    0 16px 45px rgba(53,62,92,.07);
+}
+
+.runtime-constellation-track {
+  position: absolute;
+  left: 11%;
+  right: 11%;
+  top: 1.55rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  pointer-events: none;
+}
+
+.runtime-constellation-track span {
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(167,139,250,.16), rgba(105,155,255,.14));
+  transform-origin: left center;
+}
+
+.runtime-constellation-track span:nth-child(2) {
+  background: linear-gradient(90deg, rgba(105,155,255,.14), rgba(103,232,249,.15));
+}
+
+.runtime-constellation-node {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  gap: .18rem;
+  padding: .05rem .35rem .45rem;
+  color: var(--text-muted);
+  transition:
+    color 200ms ease,
+    transform 220ms cubic-bezier(.2,.8,.2,1);
+}
+
+.runtime-constellation-node strong {
+  display: grid;
+  place-items: center;
+  width: 1.45rem;
+  height: 1.45rem;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 999px;
+  background: rgba(255,255,255,.025);
+  color: var(--text-muted);
+  font: 600 .57rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+
+.runtime-constellation-node span {
+  font-size: .58rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.runtime-constellation-node.is-active {
+  color: var(--text);
+  transform: translateY(-1px);
+}
+
+.runtime-constellation-node.is-active strong {
+  border-color: rgba(167,139,250,.3);
+  color: var(--af-violet);
+  background: rgba(167,139,250,.11);
+  box-shadow:
+    0 0 0 4px rgba(167,139,250,.04),
+    0 0 20px rgba(167,139,250,.18);
+}
+
+.runtime-constellation-node:not(.is-active):hover {
+  color: var(--text-soft);
+  transform: translateY(-1px);
+}
+
+.runtime-constellation-node:not(.is-active):hover strong {
+  border-color: rgba(105,155,255,.18);
+}
+
+.runtime-constellation::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -18%;
+  width: 18%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(167,139,250,.65), rgba(103,232,249,.38), transparent);
+  box-shadow: 0 0 14px rgba(167,139,250,.18);
+  animation: af-runtime-scan 8s ease-in-out infinite;
+}
+
+@keyframes af-runtime-scan {
+  0%, 55%, 100% { transform: translateX(0); opacity: 0; }
+  64% { opacity: 1; }
+  86% { transform: translateX(655%); opacity: 0; }
+}
+
+.runtime-constellation + .eyebrow {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- richer glass depth ------------------------------------------- */
+
+.topbar,
+.sidebar,
+.documents-card,
+.account-card,
+.activity-panel,
+.workflow-panel,
+.source-card,
+.command-palette,
+.composer {
+  border-color: rgba(255,255,255,.075);
+  backdrop-filter: blur(20px) saturate(125%);
+}
+
+:root[data-theme="light"] .topbar,
+:root[data-theme="light"] .sidebar,
+:root[data-theme="light"] .documents-card,
+:root[data-theme="light"] .account-card,
+:root[data-theme="light"] .activity-panel,
+:root[data-theme="light"] .workflow-panel,
+:root[data-theme="light"] .source-card,
+:root[data-theme="light"] .command-palette,
+:root[data-theme="light"] .composer {
+  border-color: rgba(18,24,39,.08);
+}
+
+.capability-card,
+.suggestion-card,
+.workflow-step,
+.source-card,
+.document-mini,
+.command-item {
+  transition:
+    transform 220ms cubic-bezier(.2,.8,.2,1),
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    background 220ms ease;
+}
+
+.capability-card:hover,
+.suggestion-card:hover,
+.workflow-step:hover,
+.source-card:hover,
+.document-mini:hover,
+.command-item:hover {
+  box-shadow:
+    0 14px 40px rgba(27,18,58,.10),
+    inset 0 1px 0 rgba(255,255,255,.055);
+}
+
+:root[data-theme="light"] .capability-card:hover,
+:root[data-theme="light"] .suggestion-card:hover,
+:root[data-theme="light"] .workflow-step:hover,
+:root[data-theme="light"] .source-card:hover,
+:root[data-theme="light"] .document-mini:hover,
+:root[data-theme="light"] .command-item:hover {
+  box-shadow:
+    0 14px 40px rgba(53,62,92,.10),
+    inset 0 1px 0 rgba(255,255,255,.9);
+}
+
+/* ---------- focus / micro-interaction polish ----------------------------- */
+
+button,
+input,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px rgba(167,139,250,.5);
+}
+
+.suggestion-card:active,
+.primary-action:active,
+.secondary-action:active,
+.icon-button:active,
+.command-trigger:active {
+  transform: translateY(0) scale(.985);
+}
+
+.composer textarea::selection,
+.command-search input::selection,
+.input-wrap input::selection {
+  background: rgba(167,139,250,.24);
+}
+
+/* ---------- responsive runtime rail ------------------------------------- */
+
+@media (max-width: 720px) {
+  .runtime-constellation {
+    width: min(100%, 34rem);
+    padding-inline: .35rem;
+  }
+
+  .runtime-constellation-node span {
+    font-size: .5rem;
+    letter-spacing: .04em;
+  }
+
+  .runtime-constellation-track {
+    left: 12%;
+    right: 12%;
+  }
+
+  .runtime-constellation::after {
+    animation-duration: 10s;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .runtime-constellation::after {
+    animation: none !important;
+  }
+
+  .capability-card,
+  .suggestion-card,
+  .workflow-step,
+  .source-card,
+  .document-mini,
+  .command-item {
+    transition: none !important;
+  }
+}
