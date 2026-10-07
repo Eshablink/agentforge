@@ -52,6 +52,16 @@ function shortId(value: string): string {
   return value.slice(0, 8);
 }
 
+function runtimeStage(busy: boolean, activeTool: string | null, events: AgentChatResponse["events"]): { label: string; detail: string } {
+  if (!busy) return { label: "Run complete", detail: "Outcome returned with bounded execution" };
+  if (activeTool) return { label: "Executing tool", detail: activeTool };
+  const last = events[events.length - 1];
+  if (last?.event === "retrieval") return { label: "Grounding", detail: last.detail || "Searching owned evidence" };
+  if (last?.event === "tool_result") return { label: "Verifying", detail: "Tool result received" };
+  if (last?.event === "token") return { label: "Synthesizing", detail: "Streaming the final response" };
+  return { label: "Understanding", detail: "Preparing the next bounded action" };
+}
+
 export function HomePage({ apiUrl, appInfo }: Props) {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [email, setEmail] = useState("");
@@ -856,6 +866,21 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                               <span>Running <strong>{activeTool}</strong></span>
                             </div>
                           )}
+
+                          <div className={"run-status " + (busy ? "is-live" : "is-complete")} aria-live="polite">
+                            <div className="run-status-main">
+                              <span className="run-status-indicator" />
+                              <div>
+                                <strong>{runtimeStage(busy, activeTool, answer.events).label}</strong>
+                                <small>{runtimeStage(busy, activeTool, answer.events).detail}</small>
+                              </div>
+                            </div>
+                            <div className="run-status-metrics">
+                              <span><b>{answer.sources.length}</b> evidence</span>
+                              <span><b>{answer.tools_used.length}</b> tools</span>
+                              <span><b>{answer.events.length}</b> events</span>
+                            </div>
+                          </div>
 
                           {!busy && answer.sources.length > 0 && (
                             <div className="source-section">
