@@ -1,6 +1,7 @@
 from app.core.settings import Settings
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.engine import make_url
 
 
 def _production(**overrides):
@@ -34,8 +35,9 @@ def test_settings_normalize_supabase_pooler_username() -> None:
         database_url="postgresql+psycopg://postgres:secret@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres",
         supabase_project_ref="walfvdeurvjhhlxyupln",
     )
-    assert "postgres.walfvdeurvjhhlxyupln@" in settings.database_url
-    assert "sslmode=require" in settings.database_url
+    parsed = make_url(settings.database_url)
+    assert parsed.username == "postgres.walfvdeurvjhhlxyupln"
+    assert parsed.query.get("sslmode") == "require"
 
 
 def test_settings_normalize_managed_postgres_urls() -> None:
