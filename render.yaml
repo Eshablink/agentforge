@@ -40,7 +40,10 @@ services:
           name: agentforge-web
           envVarKey: RENDER_EXTERNAL_URL
       - key: REDIS_URL
-        sync: false
+        fromService:
+          type: keyvalue
+          name: agentforge-redis
+          property: connectionString
 
   - type: web
     name: agentforge-web
@@ -75,3 +78,10 @@ services:
       - path: /*
         name: Permissions-Policy
         value: camera=(), microphone=(), geolocation=()
+
+  - type: keyvalue
+    name: agentforge-redis
+    region: singapore
+    plan: free
+    maxmemoryPolicy: allkeys_lru
+    ipAllowList: []
