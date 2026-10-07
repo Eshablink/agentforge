@@ -52,5 +52,16 @@ def test_test_and_dev_allow_local_fake_providers_but_not_sqlite():
 
 
 def test_production_accepts_private_render_key_value_endpoint() -> None:
-    settings = _production(redis_url="redis://red-db34h1l9fdbs739urr8g:6379")
+    settings = _production(
+        redis_url="redis://red-db34h1l9fdbs739urr8g:6379",
+        render_key_value_id="red-db34h1l9fdbs739urr8g",
+    )
     assert settings.redis_url == "redis://red-db34h1l9fdbs739urr8g:6379"
+
+
+def test_production_rejects_unbound_private_redis_endpoint() -> None:
+    with pytest.raises(ValidationError):
+        _production(
+            redis_url="redis://red-db34h1l9fdbs739urr8g:6379",
+            render_key_value_id="red-other-resource",
+        )
