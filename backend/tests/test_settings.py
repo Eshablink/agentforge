@@ -1,6 +1,7 @@
 from app.core.settings import Settings
 import pytest
 from pydantic import ValidationError
+from sqlalchemy.engine import make_url
 
 
 def _production(**overrides):
@@ -27,6 +28,16 @@ def test_settings_validate_chunk_overlap() -> None:
 def test_settings_content_types_parsing() -> None:
     settings = Settings(supported_content_types="text/plain, application/pdf")
     assert settings.supported_content_type_list == ["text/plain", "application/pdf"]
+
+
+def test_settings_normalize_supabase_pooler_username() -> None:
+    settings = _production(
+        database_url="postgresql+psycopg://postgres:secret@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres",
+        supabase_project_ref="walfvdeurvjhhlxyupln",
+    )
+    parsed = make_url(settings.database_url)
+    assert parsed.username == "postgres.walfvdeurvjhhlxyupln"
+    assert parsed.query.get("sslmode") == "require"
 
 
 def test_settings_normalize_managed_postgres_urls() -> None:
