@@ -10,19 +10,28 @@ from app.services.rag_service import RAGService, RAGServiceError
 router = APIRouter(tags=["chat"])
 
 
-@router.post("/chat", response_model=ChatResponse)
-def ask_question(payload: ChatRequest, db: Session = Depends(get_db)) -> ChatResponse:
-    service = RAGService(db=db)
-    try:
-        return service.answer(question=payload.question, top_k=payload.top_k, user_id=None)
-    except RAGServiceError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-
-@router.post("/me/chat", response_model=ChatResponse)
-def ask_owned_question(payload: ChatRequest, db: Session = Depends(get_db), user: User = Depends(current_user)) -> ChatResponse:
+def _answer(payload: ChatRequest, db: Session, user: User) -> ChatResponse:
     service = RAGService(db=db)
     try:
         return service.answer(question=payload.question, top_k=payload.top_k, user_id=user.id)
     except RAGServiceError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/chat", response_model=ChatResponse)
+def ask_question(
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> ChatResponse:
+    """Authenticated compatibility alias for the original chat endpoint."""
+    return _answer(payload, db, user)
+
+
+@router.post("/me/chat", response_model=ChatResponse)
+def ask_owned_question(
+    payload: ChatRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(current_user),
+) -> ChatResponse:
+    return _answer(payload, db, user)
