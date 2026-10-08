@@ -24,7 +24,10 @@ class Settings(BaseSettings):
     # Keep the password-bearing DATABASE_URL in the platform secret store and only
     # provide the non-secret project ref here so deployments can self-correct a
     # common copied-connection-string mistake.
-    supabase_project_ref: str | None = None
+    # AgentForge production is bound to this Supabase project; Render may omit
+    # dashboard-only env values on an existing service, so keep a non-secret
+    # fallback while still allowing SUPABASE_PROJECT_REF to override it.
+    supabase_project_ref: str | None = "walfvdeurvjhhlxyupln"
     database_url: str = "postgresql+psycopg://agentforge:agentforge@localhost:5432/agentforge"
     max_upload_size_bytes: int = 10 * 1024 * 1024
     max_request_body_bytes: int = 64 * 1024
@@ -134,7 +137,7 @@ class Settings(BaseSettings):
             self.supabase_project_ref
             and parsed_database.host
             and parsed_database.host.endswith(".pooler.supabase.com")
-            and parsed_database.username == "postgres"
+            and parsed_database.username in {None, "", "postgres"}
         ):
             parsed_database = parsed_database.set(username=f"postgres.{self.supabase_project_ref}")
             if "sslmode" not in parsed_database.query:
