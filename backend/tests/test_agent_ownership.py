@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from app.schemas.platform import AgentDecision
-from app.services.agent_provider import LLMDecisionProvider
+from app.services.agent_provider import AgentDecision, LLMDecisionProvider
 from app.services.agent_service import AgentOrchestrationService
 from app.services.tool_registry import ToolRegistry
 
