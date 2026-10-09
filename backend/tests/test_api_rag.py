@@ -8,6 +8,15 @@ from app.main import app
 from app.services.embedding_service import EmbeddingService
 
 client = TestClient(app)
+PASSWORD = "a-very-long-test-password"
+
+
+def _auth_headers():
+    email = f"rag-{uuid4().hex}@example.com"
+    assert client.post("/auth/register", json={"email": email, "password": PASSWORD}).status_code == 201
+    response = client.post("/auth/login", json={"email": email, "password": PASSWORD})
+    assert response.status_code == 200
+    return {"Authorization": f"Bearer {response.json()['access_token']}"}
 
 
 @pytest.fixture(autouse=True)
@@ -33,12 +42,12 @@ def _mock_retrieval_and_llm(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_documents_endpoint_rejects_unsupported_file_type() -> None:
-    response = client.post("/documents", files={"file": ("data.csv", io.BytesIO(b"a,b"), "text/csv")})
+    response = client.post("/documents", files={"file": ("data.csv", io.BytesIO(b"a,b"), "text/csv")}, headers=_auth_headers())
     assert response.status_code == 400
 
 
 def test_documents_endpoint_accepts_txt_upload() -> None:
-    response = client.post("/documents", files={"file": ("note.txt", io.BytesIO(b"agentforge data"), "text/plain")})
+    response = client.post("/documents", files={"file": ("note.txt", io.BytesIO(b"agentforge data"), "text/plain")}, headers=_auth_headers())
     assert response.status_code == 201
     payload = response.json()
     assert payload["filename"] == "note.txt"
@@ -47,14 +56,14 @@ def test_documents_endpoint_accepts_txt_upload() -> None:
 
 
 def test_chat_endpoint_returns_answer_and_sources() -> None:
-    response = client.post("/chat", json={"question": "What is in docs?", "top_k": 3})
+    response = client.post("/chat", json={"question": "What is in docs?", "top_k": 3}, headers=_auth_headers())
     assert response.status_code == 200
     assert response.json()["answer"].startswith("Grounded answer")
     assert len(response.json()["sources"]) == 1
 
 
 def test_chat_endpoint_handles_insufficient_context() -> None:
-    response = client.post("/chat", json={"question": "missing context", "top_k": 3})
+    response = client.post("/chat", json={"question": "missing context", "top_k": 3}, headers=_auth_headers())
     assert response.status_code == 200
     assert response.json()["retrieved_chunks"] == 0
     assert response.json()["sources"] == []
