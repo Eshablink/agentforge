@@ -79,8 +79,10 @@ def test_document_routes_are_owner_scoped_and_legacy_routes_are_unowned_only() -
     assert upload.status_code == 201
     assert [row["filename"] for row in client.get("/documents/me", headers=owner_headers).json()] == ["private.txt"]
     assert client.get("/documents/me", headers=other_headers).json() == []
-    legacy = client.get("/documents")
-    assert all(item["filename"] != "private.txt" for item in legacy.json())
+    legacy = client.get("/documents", headers=owner_headers)
+    assert legacy.status_code == 200
+    assert [item["filename"] for item in legacy.json()] == ["private.txt"]
+    assert client.get("/documents", headers=other_headers).json() == []
     agent = client.post("/agent/chat", json={"question": "Find the private document"}, headers=other_headers)
     assert agent.status_code == 200
     assert agent.json()["sources"] == []
