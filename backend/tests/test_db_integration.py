@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from app.core.settings import get_settings
 from app.db.session import SessionLocal, engine
 from app.models.document import Document, DocumentChunk
+from app.models.user import User
 
 
 def test_pgvector_extension_enabled() -> None:
@@ -25,11 +26,15 @@ def test_document_chunk_unique_constraint() -> None:
     session = SessionLocal()
 
     document_id = uuid.uuid4()
+    user_id = uuid.uuid4()
 
     try:
+        session.add(User(id=user_id, email=f"db-test-{user_id.hex}@example.com", password_hash="test-hash"))
+        session.flush()
         session.add(
             Document(
                 id=document_id,
+                user_id=user_id,
                 filename="constraint.txt",
                 content_type="text/plain",
                 metadata_json={},
