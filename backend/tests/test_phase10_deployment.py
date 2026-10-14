@@ -4,11 +4,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_backend_migration_runs_outside_app_replica():
+def test_backend_migration_runs_before_api_startup():
     image = (ROOT / "backend" / "Dockerfile").read_text()
     assert "USER agentforge" in image
-    assert 'python", "serve.py"' in image
-    assert "alembic upgrade head &&" not in image
+    assert "alembic -c alembic.ini upgrade head && exec python serve.py" in image
     compose = (ROOT / "docker-compose.yml").read_text()
     assert "service_completed_successfully" in compose
 
