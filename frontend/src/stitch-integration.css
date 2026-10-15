@@ -45,3 +45,58 @@ kbd, code, pre, .topbar-kicker, .eyebrow, .section-count, .source-id {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Account-backed overview cards on the first workspace screen. */
+.workspace-overview {
+  width: min(100%, 780px);
+  margin: 1.5rem auto 1.25rem;
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(19, 22, 30, 0.76), rgba(13, 16, 23, 0.68));
+  text-align: left;
+}
+.overview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.85rem;
+  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 750;
+}
+.overview-heading small { color: var(--text-muted); font-size: 0.68rem; font-weight: 500; }
+.overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
+.overview-metric {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 126px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.28rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.018);
+  color: var(--text);
+}
+.overview-icon { display: grid; width: 30px; height: 30px; place-items: center; margin-bottom: 0.2rem; border-radius: 9px; background: var(--accent-soft); color: var(--accent); }
+.overview-icon svg { width: 15px; height: 15px; }
+.overview-icon-cyan { background: rgba(56, 189, 248, 0.12); color: #38bdf8; }
+.overview-icon-green { background: rgba(16, 185, 129, 0.12); color: #10b981; }
+.overview-value { font-size: 1.35rem; font-weight: 780; line-height: 1.15; letter-spacing: -0.04em; }
+.overview-label { color: var(--text-soft); font-size: 0.74rem; font-weight: 650; }
+.overview-metric > small { color: var(--text-muted); font-size: 0.65rem; line-height: 1.4; }
+.overview-action { width: 100%; text-align: left; cursor: pointer; transition: border-color 160ms ease, background 160ms ease, transform 160ms ease; }
+.overview-action:hover { transform: translateY(-2px); border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.045); }
+.overview-action-value { font-size: 1rem; }
+.overview-action-arrow { position: absolute; top: 0.95rem; right: 0.8rem; color: var(--text-muted); }
+.overview-action-arrow svg { width: 14px; height: 14px; }
+@media (max-width: 640px) {
+  .workspace-overview { margin: 1.15rem auto; padding: 0.75rem; }
+  .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .overview-metric { min-height: 116px; padding: 0.7rem; }
+  .overview-action { grid-column: 1 / -1; min-height: 92px; }
+}
