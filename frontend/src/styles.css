@@ -3,23 +3,23 @@
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --bg: #080a0f;
-  --surface: rgba(16, 19, 28, 0.88);
-  --surface-solid: #11151f;
-  --surface-raised: #151a25;
-  --surface-soft: #0e121a;
+  --bg: #07090e;
+  --surface: rgba(19, 22, 30, 0.92);
+  --surface-solid: #13161e;
+  --surface-raised: #191d27;
+  --surface-soft: #0d1017;
   --border: rgba(255, 255, 255, 0.09);
   --border-strong: rgba(255, 255, 255, 0.15);
   --text: #f4f7fb;
   --text-soft: #a7afbf;
-  --text-muted: #70798a;
-  --accent: #9a7cff;
-  --accent-strong: #7c5cff;
-  --accent-soft: rgba(154, 124, 255, 0.12);
-  --accent-glow: rgba(124, 92, 255, 0.26);
-  --success: #5ee6a8;
-  --danger: #ff7d90;
-  --warning: #ffc96b;
+  --text-muted: #9aa3b3;
+  --accent: #ff2d75;
+  --accent-strong: #e91e63;
+  --accent-soft: rgba(255, 45, 117, 0.14);
+  --accent-glow: rgba(255, 45, 117, 0.20);
+  --success: #10b981;
+  --danger: #ef4444;
+  --warning: #f59e0b;
   --shadow: 0 24px 80px rgba(0, 0, 0, 0.38);
   --radius-lg: 24px;
   --radius-md: 16px;
@@ -64,7 +64,7 @@ body {
   margin: 0;
   background:
     radial-gradient(circle at 14% 6%, var(--accent-glow), transparent 26rem),
-    radial-gradient(circle at 88% 18%, rgba(69, 132, 255, 0.1), transparent 24rem),
+    radial-gradient(circle at 88% 18%, rgba(56, 189, 248, 0.10), transparent 24rem),
     var(--bg);
   color: var(--text);
 }
@@ -105,7 +105,7 @@ svg {
 }
 
 ::selection {
-  background: rgba(154, 124, 255, 0.28);
+  background: rgba(255, 45, 117, 0.28);
   color: var(--text);
 }
 
@@ -141,7 +141,7 @@ svg {
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 11px;
-  background: linear-gradient(145deg, rgba(164, 132, 255, 0.9), rgba(82, 111, 255, 0.78));
+  background: linear-gradient(145deg, rgba(255, 45, 117, 0.94), rgba(56, 189, 248, 0.72));
   box-shadow: 0 10px 30px var(--accent-glow);
 }
 
@@ -1916,7 +1916,7 @@ svg {
   --text-soft: #b4b9c8;
   --text-muted: #72798a;
   --accent: #a78bfa;
-  --accent-strong: #7c5cff;
+  --accent-strong: #e91e63;
   --accent-soft: rgba(167, 139, 250, 0.13);
   --accent-glow: rgba(124, 92, 255, 0.25);
   --success: #62e9ab;
