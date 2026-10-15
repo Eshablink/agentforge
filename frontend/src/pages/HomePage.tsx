@@ -719,7 +719,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
               </button>
               <div>
                 <span className="topbar-kicker">AGENTFORGE · OPERATOR WORKSPACE</span>
-                <h1>{activeThread?.title || (activeConversation ? "Conversation" : "New conversation")}</h1>
+                <h1>{activeView === "knowledge" ? "Knowledge base" : activeThread?.title || (activeConversation ? "Conversation" : "New conversation")}</h1>
               </div>
             </div>
             <div className="topbar-actions">
