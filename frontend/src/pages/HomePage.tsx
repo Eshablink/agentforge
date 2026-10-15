@@ -78,6 +78,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState<"workspace" | "knowledge" | "settings">("workspace");
   const [documentsOpen, setDocumentsOpen] = useState(true);
   const [activityOpen, setActivityOpen] = useState(false);
   const [copiedAnswer, setCopiedAnswer] = useState(false);
@@ -430,7 +431,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
       label: "Open knowledge base",
       description: documents.length + " indexed " + documentCountLabel,
       icon: "file",
-      action: () => setDocumentsOpen(true),
+      action: () => { setDocumentsOpen(true); setActiveView("knowledge"); },
     },
     {
       id: "theme",
@@ -620,6 +621,11 @@ export function HomePage({ apiUrl, appInfo }: Props) {
             <kbd>⌘ K</kbd>
           </button>
 
+          <nav className="primary-nav" aria-label="Main navigation">
+            <button type="button" className={"primary-nav-item " + (activeView === "workspace" ? "is-active" : "")} onClick={() => { setActiveView("workspace"); setSidebarOpen(false); }}><Icon name="bot" /><span>Workspace</span></button>
+            <button type="button" className={"primary-nav-item " + (activeView === "knowledge" ? "is-active" : "")} onClick={() => { setActiveView("knowledge"); setDocumentsOpen(true); setSidebarOpen(false); }}><Icon name="file" /><span>Knowledge base</span><span className="nav-count">{documents.length}</span></button>
+            <button type="button" className={"primary-nav-item " + (activeView === "settings" ? "is-active" : "")} onClick={() => { setActiveView("settings"); setSidebarOpen(false); }}><Icon name="settings" /><span>Settings</span></button>
+          </nav>
           <div className="sidebar-section">
             <div className="section-label">
               <span>Conversations</span>
@@ -714,7 +720,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
               </button>
               <div>
                 <span className="topbar-kicker">AGENTFORGE · OPERATOR WORKSPACE</span>
-                <h1>{activeThread?.title || (activeConversation ? "Conversation" : "New conversation")}</h1>
+                <h1>{activeView === "knowledge" ? "Knowledge base" : activeView === "settings" ? "Settings" : activeThread?.title || (activeConversation ? "Conversation" : "New conversation")}</h1>
               </div>
             </div>
             <div className="topbar-actions">
@@ -807,6 +813,37 @@ export function HomePage({ apiUrl, appInfo }: Props) {
             </div>
           )}
           <div className="workspace-scroll">
+            {activeView === "settings" ? (
+              <section className="knowledge-page settings-page" aria-labelledby="settings-title">
+                <div className="knowledge-page-heading"><div><span className="eyebrow">PREFERENCES</span><h2 id="settings-title">Settings</h2><p>Manage the appearance of this workspace and review your current signed-in session.</p></div></div>
+                <section className="settings-section">
+                  <div className="settings-section-heading"><span className="overview-icon"><Icon name="sun" /></span><div><strong>Appearance</strong><p>Choose a comfortable workspace theme.</p></div></div>
+                  <div className="settings-theme-options">
+                    <button type="button" className={"settings-theme-option " + (theme === "dark" ? "is-selected" : "")} onClick={() => setTheme("dark")} aria-pressed={theme === "dark"}><span className="theme-preview theme-preview-dark"><i /><i /><i /></span><strong>Dark</strong><small>Low-light workspace</small></button>
+                    <button type="button" className={"settings-theme-option " + (theme === "light" ? "is-selected" : "")} onClick={() => setTheme("light")} aria-pressed={theme === "light"}><span className="theme-preview theme-preview-light"><i /><i /><i /></span><strong>Light</strong><small>Bright workspace</small></button>
+                  </div>
+                </section>
+                <section className="settings-section">
+                  <div className="settings-section-heading"><span className="overview-icon overview-icon-cyan"><Icon name="user" /></span><div><strong>Account and session</strong><p>Current account identity and authentication state.</p></div></div>
+                  <div className="settings-detail-row"><span>Email</span><strong>{session.user.email}</strong></div>
+                  <div className="settings-detail-row"><span>Session expires</span><strong>{formatTime(session.expires_at)} · {formatDate(session.expires_at)}</strong></div>
+                  <div className="settings-detail-row"><span>Authentication</span><strong className="settings-secure"><span className="status-dot" /> Authenticated session</strong></div>
+                  <div className="settings-danger-zone"><div><strong>Sign out</strong><p>End this session on this device.</p></div><button type="button" className="secondary-action" onClick={() => void logout()}><Icon name="logout" /> Sign out</button></div>
+                </section>
+                <p className="knowledge-footnote"><Icon name="settings" /> Password resets, account deletion, and provider-key management are not exposed here because this API does not currently provide those operations.</p>
+              </section>
+            ) : activeView === "knowledge" ? (
+              <section className="knowledge-page" aria-labelledby="knowledge-title">
+                <div className="knowledge-page-heading"><div><span className="eyebrow">YOUR SOURCES</span><h2 id="knowledge-title">Knowledge base</h2><p>Manage the documents available to your account-scoped retrieval workflow.</p></div>
+                  <label className="primary-action knowledge-upload"><Icon name="upload" /><span>{uploading ? "Indexing…" : "Upload document"}</span><input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" onChange={handleUpload} disabled={uploading} /></label>
+                </div>
+                <div className="knowledge-summary"><div><span className="overview-icon"><Icon name="file" /></span><strong>{documents.length}</strong><span>Total documents</span></div><div><span className="overview-icon overview-icon-green"><Icon name="check" /></span><strong>{documents.filter((item) => documentStatus(item.status) === "ready").length}</strong><span>Ready for retrieval</span></div><div><span className="overview-icon overview-icon-cyan"><Icon name="wand" /></span><strong>{documents.filter((item) => documentStatus(item.status) === "processing").length}</strong><span>Processing</span></div></div>
+                <div className="knowledge-table-wrap"><div className="knowledge-table-heading"><strong>Your documents</strong><span>Private to your account</span></div>
+                  {documents.length ? <div className="knowledge-document-list">{documents.map((document) => { const state = documentStatus(document.status); return <article className="knowledge-document-row" key={document.id}><span className="knowledge-file-icon"><Icon name="file" /></span><span className="knowledge-document-copy"><strong title={document.filename}>{document.filename}</strong><small>{document.chunk_count} indexed chunks · Added {formatDate(document.created_at)}</small></span><span className={"status-pill " + state}>{state === "ready" ? <Icon name="check" /> : <span className="status-dot" />}{state === "ready" ? "Ready" : state === "error" ? "Failed" : "Processing"}</span></article>; })}</div> : <div className="knowledge-empty"><span className="knowledge-empty-icon"><Icon name="file" /></span><strong>Your knowledge base starts here</strong><p>Upload a PDF, TXT, or Markdown file to make its content available to your grounded conversations.</p></div>}
+                </div><p className="knowledge-footnote"><Icon name="settings" /> Documents are retrieved through the authenticated, account-scoped API. Maximum upload size: 10 MB.</p>
+              </section>
+            ) : (
+              <>
             <div className="operator-rail" aria-label="Agent runtime status">
               <span><strong>Context</strong>{documents.length} source{documents.length === 1 ? "" : "s"}</span>
               <span><strong>Memory</strong>{conversations.length} thread{conversations.length === 1 ? "" : "s"}</span>
@@ -826,6 +863,33 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                   <span className="eyebrow">YOUR AI WORKSPACE</span>
                   <h2>What should AgentForge take care of?</h2>
                   <p>Bring a task, a question, or a pile of documents. AgentForge grounds the request, uses permitted tools, and shows the evidence behind its work.</p>
+                  <section className="workspace-overview" aria-label="Workspace overview">
+                    <div className="overview-heading">
+                      <span>Workspace overview</span>
+                      <small>Live account data</small>
+                    </div>
+                    <div className="overview-grid">
+                      <div className="overview-metric">
+                        <span className="overview-icon"><Icon name="file" /></span>
+                        <span className="overview-value">{documents.length}</span>
+                        <span className="overview-label">Documents</span>
+                        <small>{documents.filter((item) => documentStatus(item.status) === "ready").length} ready for retrieval</small>
+                      </div>
+                      <div className="overview-metric">
+                        <span className="overview-icon overview-icon-cyan"><Icon name="bot" /></span>
+                        <span className="overview-value">{conversations.length}</span>
+                        <span className="overview-label">Conversations</span>
+                        <small>Saved to your workspace</small>
+                      </div>
+                      <button className="overview-metric overview-action" type="button" onClick={() => { setActiveView("knowledge"); setDocumentsOpen(true); setSidebarOpen(false); }}>
+                        <span className="overview-icon overview-icon-green"><Icon name="upload" /></span>
+                        <span className="overview-value overview-action-value">Add files</span>
+                        <span className="overview-label">Knowledge base</span>
+                        <small>PDF, TXT, or Markdown</small>
+                        <span className="overview-action-arrow"><Icon name="arrow" /></span>
+                      </button>
+                    </div>
+                  </section>
                   <div className="prompt-suggestions">
                     {[
                       ["Summarize my latest document", "file"],
@@ -1020,6 +1084,8 @@ export function HomePage({ apiUrl, appInfo }: Props) {
               </form>
               <p className="composer-disclaimer">AgentForge can make mistakes. Verify important information against your source documents.</p>
             </div>
+              </>
+            )}
           </div>
         </section>
       </div>
