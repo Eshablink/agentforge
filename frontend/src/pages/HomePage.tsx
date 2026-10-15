@@ -78,6 +78,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeView, setActiveView] = useState<"workspace" | "knowledge">("workspace");
   const [documentsOpen, setDocumentsOpen] = useState(true);
   const [activityOpen, setActivityOpen] = useState(false);
   const [copiedAnswer, setCopiedAnswer] = useState(false);
@@ -430,7 +431,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
       label: "Open knowledge base",
       description: documents.length + " indexed " + documentCountLabel,
       icon: "file",
-      action: () => setDocumentsOpen(true),
+      action: () => { setDocumentsOpen(true); setActiveView("knowledge"); },
     },
     {
       id: "theme",
@@ -620,6 +621,10 @@ export function HomePage({ apiUrl, appInfo }: Props) {
             <kbd>⌘ K</kbd>
           </button>
 
+          <nav className="primary-nav" aria-label="Main navigation">
+            <button type="button" className={"primary-nav-item " + (activeView === "workspace" ? "is-active" : "")} onClick={() => { setActiveView("workspace"); setSidebarOpen(false); }}><Icon name="bot" /><span>Workspace</span></button>
+            <button type="button" className={"primary-nav-item " + (activeView === "knowledge" ? "is-active" : "")} onClick={() => { setActiveView("knowledge"); setDocumentsOpen(true); setSidebarOpen(false); }}><Icon name="file" /><span>Knowledge base</span><span className="nav-count">{documents.length}</span></button>
+          </nav>
           <div className="sidebar-section">
             <div className="section-label">
               <span>Conversations</span>
@@ -807,6 +812,18 @@ export function HomePage({ apiUrl, appInfo }: Props) {
             </div>
           )}
           <div className="workspace-scroll">
+            {activeView === "knowledge" ? (
+              <section className="knowledge-page" aria-labelledby="knowledge-title">
+                <div className="knowledge-page-heading"><div><span className="eyebrow">YOUR SOURCES</span><h2 id="knowledge-title">Knowledge base</h2><p>Manage the documents available to your account-scoped retrieval workflow.</p></div>
+                  <label className="primary-action knowledge-upload"><Icon name="upload" /><span>{uploading ? "Indexing…" : "Upload document"}</span><input type="file" accept=".pdf,.txt,.md,application/pdf,text/plain,text/markdown" onChange={handleUpload} disabled={uploading} /></label>
+                </div>
+                <div className="knowledge-summary"><div><span className="overview-icon"><Icon name="file" /></span><strong>{documents.length}</strong><span>Total documents</span></div><div><span className="overview-icon overview-icon-green"><Icon name="check" /></span><strong>{documents.filter((item) => documentStatus(item.status) === "ready").length}</strong><span>Ready for retrieval</span></div><div><span className="overview-icon overview-icon-cyan"><Icon name="activity" /></span><strong>{documents.filter((item) => documentStatus(item.status) === "processing").length}</strong><span>Processing</span></div></div>
+                <div className="knowledge-table-wrap"><div className="knowledge-table-heading"><strong>Your documents</strong><span>Private to your account</span></div>
+                  {documents.length ? <div className="knowledge-document-list">{documents.map((document) => { const state = documentStatus(document.status); return <article className="knowledge-document-row" key={document.id}><span className="knowledge-file-icon"><Icon name="file" /></span><span className="knowledge-document-copy"><strong title={document.filename}>{document.filename}</strong><small>{document.chunk_count} indexed chunks · Added {formatDate(document.created_at)}</small></span><span className={"status-pill " + state}>{state === "ready" ? <Icon name="check" /> : <span className="status-dot" />}{state === "ready" ? "Ready" : state === "error" ? "Failed" : "Processing"}</span></article>; })}</div> : <div className="knowledge-empty"><span className="knowledge-empty-icon"><Icon name="file" /></span><strong>Your knowledge base starts here</strong><p>Upload a PDF, TXT, or Markdown file to make its content available to your grounded conversations.</p></div>}
+                </div><p className="knowledge-footnote"><Icon name="shield" /> Documents are retrieved through the authenticated, account-scoped API. Maximum upload size: 10 MB.</p>
+              </section>
+            ) : (
+              <>
             <div className="operator-rail" aria-label="Agent runtime status">
               <span><strong>Context</strong>{documents.length} source{documents.length === 1 ? "" : "s"}</span>
               <span><strong>Memory</strong>{conversations.length} thread{conversations.length === 1 ? "" : "s"}</span>
@@ -844,7 +861,7 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                         <span className="overview-label">Conversations</span>
                         <small>Saved to your workspace</small>
                       </div>
-                      <button className="overview-metric overview-action" type="button" onClick={() => { setDocumentsOpen(true); setSidebarOpen(true); }}>
+                      <button className="overview-metric overview-action" type="button" onClick={() => { setActiveView("knowledge"); setDocumentsOpen(true); setSidebarOpen(false); }}>
                         <span className="overview-icon overview-icon-green"><Icon name="upload" /></span>
                         <span className="overview-value overview-action-value">Add files</span>
                         <span className="overview-label">Knowledge base</span>
@@ -1047,6 +1064,8 @@ export function HomePage({ apiUrl, appInfo }: Props) {
               </form>
               <p className="composer-disclaimer">AgentForge can make mistakes. Verify important information against your source documents.</p>
             </div>
+              </>
+            )}
           </div>
         </section>
       </div>
