@@ -1317,3 +1317,73 @@ textarea:focus-visible {  outline: 0;
     transition: none !important;
   }
 }
+
+/* Stitch design-system alignment: cinematic dark surfaces, magenta/cyan accents. */
+.auth-visual {
+  background:
+    radial-gradient(ellipse at 18% 28%, rgba(255, 45, 117, 0.16), transparent 38%),
+    radial-gradient(ellipse at 82% 76%, rgba(56, 189, 248, 0.12), transparent 34%),
+    linear-gradient(135deg, #0b0d14 0%, #080a10 58%, #10101a 100%);
+}
+
+.auth-visual::before {
+  opacity: 0.3;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, black, transparent 92%);
+}
+
+.auth-copy em {
+  color: var(--accent);
+  text-shadow: 0 0 34px var(--accent-glow);
+}
+
+.capability-card {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(145deg, rgba(22, 25, 36, 0.82), rgba(12, 14, 22, 0.8));
+  backdrop-filter: blur(16px);
+}
+
+.capability-icon {
+  border-color: rgba(255, 45, 117, 0.22);
+  background: rgba(255, 45, 117, 0.09);
+  color: #ff6b9d;
+}
+
+.primary-action {
+  background: linear-gradient(110deg, #e91e63 0%, #ff2d75 58%, #fb5590 100%);
+  box-shadow: 0 8px 28px rgba(255, 45, 117, 0.2);
+}
+
+.primary-action:hover:not(:disabled) {
+  box-shadow: 0 12px 34px rgba(255, 45, 117, 0.3);
+}
+
+.conversation-row.active {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.composer:focus-within {
+  border-color: rgba(255, 45, 117, 0.46);
+  box-shadow: 0 0 0 3px rgba(255, 45, 117, 0.055), var(--shadow);
+}
+
+:root[data-theme="light"] .auth-visual {
+  background:
+    radial-gradient(ellipse at 18% 28%, rgba(255, 45, 117, 0.09), transparent 38%),
+    radial-gradient(ellipse at 82% 76%, rgba(56, 189, 248, 0.08), transparent 34%),
+    linear-gradient(135deg, #fbf9fc 0%, #f4f5f9 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before,
+  .auth-visual::after,
+  .auth-visual .brand-lockup,
+  .auth-copy,
+  .capability-card {
+    animation: none !important;
+  }
+}
+
