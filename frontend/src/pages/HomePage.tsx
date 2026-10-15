@@ -826,6 +826,33 @@ export function HomePage({ apiUrl, appInfo }: Props) {
                   <span className="eyebrow">YOUR AI WORKSPACE</span>
                   <h2>What should AgentForge take care of?</h2>
                   <p>Bring a task, a question, or a pile of documents. AgentForge grounds the request, uses permitted tools, and shows the evidence behind its work.</p>
+                  <section className="workspace-overview" aria-label="Workspace overview">
+                    <div className="overview-heading">
+                      <span>Workspace overview</span>
+                      <small>Live account data</small>
+                    </div>
+                    <div className="overview-grid">
+                      <div className="overview-metric">
+                        <span className="overview-icon"><Icon name="file" /></span>
+                        <span className="overview-value">{documents.length}</span>
+                        <span className="overview-label">Documents</span>
+                        <small>{documents.filter((item) => documentStatus(item.status) === "ready").length} ready for retrieval</small>
+                      </div>
+                      <div className="overview-metric">
+                        <span className="overview-icon overview-icon-cyan"><Icon name="bot" /></span>
+                        <span className="overview-value">{conversations.length}</span>
+                        <span className="overview-label">Conversations</span>
+                        <small>Saved to your workspace</small>
+                      </div>
+                      <button className="overview-metric overview-action" type="button" onClick={() => { setDocumentsOpen(true); setSidebarOpen(true); }}>
+                        <span className="overview-icon overview-icon-green"><Icon name="upload" /></span>
+                        <span className="overview-value overview-action-value">Add files</span>
+                        <span className="overview-label">Knowledge base</span>
+                        <small>PDF, TXT, or Markdown</small>
+                        <span className="overview-action-arrow"><Icon name="arrow" /></span>
+                      </button>
+                    </div>
+                  </section>
                   <div className="prompt-suggestions">
                     {[
                       ["Summarize my latest document", "file"],
