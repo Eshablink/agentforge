@@ -37,11 +37,11 @@
   --border-strong: rgba(18, 24, 39, 0.14);
   --text: #151924;
   --text-soft: #61697a;
-  --text-muted: #8991a0;
-  --accent: #6d51dc;
-  --accent-strong: #5c41c7;
-  --accent-soft: rgba(109, 81, 220, 0.08);
-  --accent-glow: rgba(109, 81, 220, 0.16);
+  --text-muted: #626b7b;
+  --accent: #d81b60;
+  --accent-strong: #ad1457;
+  --accent-soft: rgba(216, 27, 96, 0.09);
+  --accent-glow: rgba(216, 27, 96, 0.14);
   --success: #19945e;
   --danger: #c43b55;
   --warning: #a26b00;
