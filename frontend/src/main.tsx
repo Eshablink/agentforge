@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./styles.css";
 import "./visual-2026.css";
+import "./stitch-integration.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
