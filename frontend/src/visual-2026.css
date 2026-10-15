@@ -4,12 +4,12 @@
 /* ========================================================================== */
 
 :root {
-  --af-violet: #a78bfa;
-  --af-violet-2: #7c5cff;
-  --af-blue: #6d9bff;
-  --af-cyan: #69d5ff;
-  --af-lime: #62e9ab;
-  --af-hot: #d18cff;
+  --af-violet: #ff2d75;
+  --af-violet-2: #e91e63;
+  --af-blue: #38bdf8;
+  --af-cyan: #38bdf8;
+  --af-lime: #10b981;
+  --af-hot: #ff2d75;
   --af-grid: rgba(255,255,255,.035);
 }
 
@@ -24,9 +24,9 @@ body::before {
   z-index: -2;
   pointer-events: none;
   background:
-    radial-gradient(32rem 20rem at 8% 18%, rgba(167,139,250,.10), transparent 70%),
-    radial-gradient(30rem 22rem at 88% 12%, rgba(105,155,255,.08), transparent 72%),
-    radial-gradient(34rem 22rem at 56% 92%, rgba(209,140,255,.055), transparent 72%);
+    radial-gradient(32rem 20rem at 8% 18%, rgba(255,45,117,.10), transparent 70%),
+    radial-gradient(30rem 22rem at 88% 12%, rgba(56,189,248,.08), transparent 72%),
+    radial-gradient(34rem 22rem at 56% 92%, rgba(255,45,117,.055), transparent 72%);
   animation: af-aura-drift 20s ease-in-out infinite alternate;
 }
 
@@ -74,7 +74,7 @@ body::after {
 .auth-visual::after {
   background:
     linear-gradient(115deg, transparent 18%, rgba(255,255,255,.06) 46%, transparent 64%),
-    radial-gradient(22rem 14rem at 76% 18%, rgba(167,139,250,.07), transparent 72%);
+    radial-gradient(22rem 14rem at 76% 18%, rgba(255,45,117,.07), transparent 72%);
   background-size: 180% 180%, auto;
   animation:
     af-sheen 12s ease-in-out infinite,
@@ -146,7 +146,7 @@ body::after {
   border-radius: inherit;
   background:
     linear-gradient(130deg, rgba(255,255,255,.025), transparent 28%),
-    radial-gradient(18rem 12rem at 88% 4%, rgba(105,155,255,.07), transparent 72%);
+    radial-gradient(18rem 12rem at 88% 4%, rgba(56,189,248,.07), transparent 72%);
 }
 
 /* ---------- brand + controls ---------- */
@@ -210,8 +210,8 @@ body::after {
   z-index: 0;
   pointer-events: none;
   background:
-    radial-gradient(26rem 18rem at 50% 0%, rgba(167,139,250,.10), transparent 72%),
-    radial-gradient(18rem 16rem at 18% 76%, rgba(105,155,255,.055), transparent 72%);
+    radial-gradient(26rem 18rem at 50% 0%, rgba(255,45,117,.10), transparent 72%),
+    radial-gradient(18rem 16rem at 18% 76%, rgba(56,189,248,.055), transparent 72%);
   animation: af-workspace-breathe 10s ease-in-out infinite alternate;
 }
 
@@ -263,7 +263,7 @@ body::after {
 .welcome-state::before {
   background:
     radial-gradient(circle, rgba(126,96,255,.14), transparent 60%),
-    conic-gradient(from 210deg, transparent, rgba(105,155,255,.05), transparent);
+    conic-gradient(from 210deg, transparent, rgba(56,189,248,.05), transparent);
   animation: af-hero-pulse 9s ease-in-out infinite alternate;
 }
 
@@ -280,17 +280,17 @@ body::after {
 }
 
 .welcome-orb::before {
-  border-color: rgba(167,139,250,.13);
+  border-color: rgba(255,45,117,.13);
 }
 
 .welcome-orb::after {
-  border-color: rgba(105,155,255,.08);
+  border-color: rgba(56,189,248,.08);
 }
 
 .welcome-orb svg {
   position: relative;
   z-index: 2;
-  filter: drop-shadow(0 0 16px rgba(167,139,250,.35));
+  filter: drop-shadow(0 0 16px rgba(255,45,117,.35));
 }
 
 @keyframes af-orb-bloom {
@@ -324,8 +324,8 @@ body::after {
   inset: 0;
   z-index: -1;
   background:
-    linear-gradient(120deg, rgba(167,139,250,.10), transparent 34%),
-    radial-gradient(12rem 10rem at 90% 110%, rgba(105,155,255,.08), transparent 70%);
+    linear-gradient(120deg, rgba(255,45,117,.10), transparent 34%),
+    radial-gradient(12rem 10rem at 90% 110%, rgba(56,189,248,.08), transparent 70%);
   opacity: .55;
   transition: opacity 220ms ease, transform 300ms ease;
 }
@@ -400,8 +400,8 @@ body::after {
 }
 .workflow-step:hover {
   transform: translateY(-3px);
-  border-color: rgba(167,139,250,.28);
-  background: rgba(167,139,250,.035);
+  border-color: rgba(255,45,117,.28);
+  background: rgba(255,45,117,.035);
 }
 
 /* ---------- live response ---------- */
@@ -423,12 +423,12 @@ body::after {
 }
 
 .run-status.is-live {
-  border-color: rgba(167,139,250,.20);
-  box-shadow: 0 0 0 1px rgba(167,139,250,.03), 0 12px 34px rgba(94,70,180,.10);
+  border-color: rgba(255,45,117,.20);
+  box-shadow: 0 0 0 1px rgba(255,45,117,.03), 0 12px 34px rgba(94,70,180,.10);
 }
 
 .run-status.is-live .run-status-indicator {
-  box-shadow: 0 0 0 4px rgba(167,139,250,.09), 0 0 18px rgba(167,139,250,.20);
+  box-shadow: 0 0 0 4px rgba(255,45,117,.09), 0 0 18px rgba(255,45,117,.20);
   animation: af-live-indicator 1.6s ease-in-out infinite;
 }
 
@@ -442,8 +442,8 @@ body::after {
 }
 
 @keyframes af-working-breathe {
-  from { box-shadow: 0 0 0 rgba(167,139,250,0); }
-  to { box-shadow: 0 0 24px rgba(167,139,250,.08); }
+  from { box-shadow: 0 0 0 rgba(255,45,117,0); }
+  to { box-shadow: 0 0 24px rgba(255,45,117,.08); }
 }
 
 /* ---------- evidence cards ---------- */
@@ -480,14 +480,14 @@ body::after {
   bottom: .9rem;
   height: 72px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(124,92,255,.10), transparent 72%);
+  background: radial-gradient(circle, rgba(233,30,99,.10), transparent 72%);
   filter: blur(20px);
   pointer-events: none;
 }
 
 .composer::before {
   background:
-    linear-gradient(90deg, rgba(167,139,250,.28), transparent 36%, rgba(105,155,255,.24));
+    linear-gradient(90deg, rgba(255,45,117,.28), transparent 36%, rgba(56,189,248,.24));
   background-size: 180% 100%;
   animation: af-composer-flow 9s ease-in-out infinite;
 }
@@ -533,7 +533,7 @@ body::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(167,139,250,.06), transparent 58%);
+  background: linear-gradient(90deg, rgba(255,45,117,.06), transparent 58%);
   transform: translateX(-102%);
   transition: transform 260ms cubic-bezier(.2,.8,.2,1);
 }
@@ -544,14 +544,14 @@ body::after {
 }
 
 .command-item.is-selected {
-  border-color: rgba(167,139,250,.18);
-  background: rgba(167,139,250,.065);
+  border-color: rgba(255,45,117,.18);
+  background: rgba(255,45,117,.065);
   transform: translateX(2px);
 }
 
 .command-item.is-selected .command-item-icon {
   color: var(--af-violet);
-  box-shadow: 0 0 0 4px rgba(167,139,250,.06);
+  box-shadow: 0 0 0 4px rgba(255,45,117,.06);
 }
 
 /* ---------- light theme polish ---------- */
@@ -616,10 +616,10 @@ body::after {
   width: min(680px, 92vw);
   margin: -0.25rem auto 1.15rem;
   padding: 0.7rem 0.55rem 0.15rem;
-  border: 1px solid rgba(167,139,250,.11);
+  border: 1px solid rgba(255,45,117,.11);
   border-radius: 18px;
   background:
-    linear-gradient(135deg, rgba(167,139,250,.075), rgba(105,155,255,.028) 52%, rgba(103,232,249,.045)),
+    linear-gradient(135deg, rgba(255,45,117,.075), rgba(56,189,248,.028) 52%, rgba(103,232,249,.045)),
     rgba(11,14,22,.5);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.055),
@@ -650,12 +650,12 @@ body::after {
 .runtime-constellation-track span {
   display: block;
   height: 1px;
-  background: linear-gradient(90deg, rgba(167,139,250,.16), rgba(105,155,255,.14));
+  background: linear-gradient(90deg, rgba(255,45,117,.16), rgba(56,189,248,.14));
   transform-origin: left center;
 }
 
 .runtime-constellation-track span:nth-child(2) {
-  background: linear-gradient(90deg, rgba(105,155,255,.14), rgba(103,232,249,.15));
+  background: linear-gradient(90deg, rgba(56,189,248,.14), rgba(103,232,249,.15));
 }
 
 .runtime-constellation-node {
@@ -696,12 +696,12 @@ body::after {
 }
 
 .runtime-constellation-node.is-active strong {
-  border-color: rgba(167,139,250,.3);
+  border-color: rgba(255,45,117,.3);
   color: var(--af-violet);
-  background: rgba(167,139,250,.11);
+  background: rgba(255,45,117,.11);
   box-shadow:
-    0 0 0 4px rgba(167,139,250,.04),
-    0 0 20px rgba(167,139,250,.18);
+    0 0 0 4px rgba(255,45,117,.04),
+    0 0 20px rgba(255,45,117,.18);
 }
 
 .runtime-constellation-node:not(.is-active):hover {
@@ -710,7 +710,7 @@ body::after {
 }
 
 .runtime-constellation-node:not(.is-active):hover strong {
-  border-color: rgba(105,155,255,.18);
+  border-color: rgba(56,189,248,.18);
 }
 
 .runtime-constellation::after {
@@ -720,8 +720,8 @@ body::after {
   left: -18%;
   width: 18%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(167,139,250,.65), rgba(103,232,249,.38), transparent);
-  box-shadow: 0 0 14px rgba(167,139,250,.18);
+  background: linear-gradient(90deg, transparent, rgba(255,45,117,.65), rgba(103,232,249,.38), transparent);
+  box-shadow: 0 0 14px rgba(255,45,117,.18);
   animation: af-runtime-scan 8s ease-in-out infinite;
 }
 
@@ -811,7 +811,7 @@ input:focus-visible,
 textarea:focus-visible {  outline: 0;
   box-shadow:
     0 0 0 2px var(--bg),
-    0 0 0 4px rgba(167,139,250,.5);
+    0 0 0 4px rgba(255,45,117,.5);
 }
 
 .suggestion-card:active,
@@ -825,7 +825,7 @@ textarea:focus-visible {  outline: 0;
 .composer textarea::selection,
 .command-search input::selection,
 .input-wrap input::selection {
-  background: rgba(167,139,250,.24);
+  background: rgba(255,45,117,.24);
 }
 
 /* ---------- responsive runtime rail ------------------------------------- */
@@ -871,7 +871,7 @@ textarea:focus-visible {  outline: 0;
 
 .workspace-scroll {
   background:
-    radial-gradient(circle at 50% 10%, rgba(167,139,250,.055), transparent 32rem),
+    radial-gradient(circle at 50% 10%, rgba(255,45,117,.055), transparent 32rem),
     radial-gradient(circle at 92% 54%, rgba(103,232,249,.035), transparent 28rem);
 }
 
@@ -888,8 +888,8 @@ textarea:focus-visible {  outline: 0;
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 32%, rgba(167,139,250,.10), transparent 42%),
-    radial-gradient(circle at 62% 52%, rgba(105,155,255,.055), transparent 35%);
+    radial-gradient(circle at 50% 32%, rgba(255,45,117,.10), transparent 42%),
+    radial-gradient(circle at 62% 52%, rgba(56,189,248,.055), transparent 35%);
   filter: blur(10px);
 }
 
@@ -915,8 +915,8 @@ textarea:focus-visible {  outline: 0;
   width: 35%;
   height: 1px;
   pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(167,139,250,.55), rgba(103,232,249,.30), transparent);
-  box-shadow: 0 0 18px rgba(167,139,250,.14);
+  background: linear-gradient(90deg, transparent, rgba(255,45,117,.55), rgba(103,232,249,.30), transparent);
+  box-shadow: 0 0 18px rgba(255,45,117,.14);
   animation: af-story-sweep 9s ease-in-out infinite;
 }
 
@@ -944,7 +944,7 @@ textarea:focus-visible {  outline: 0;
 
 .workflow-step:hover .step-icon {
   transform: scale(1.05);
-  box-shadow: 0 0 0 5px rgba(167,139,250,.055), 0 10px 24px rgba(27,18,58,.12);
+  box-shadow: 0 0 0 5px rgba(255,45,117,.055), 0 10px 24px rgba(27,18,58,.12);
 }
 
 .operator-rail {
@@ -952,7 +952,7 @@ textarea:focus-visible {  outline: 0;
 }
 
 .operator-rail:hover {
-  border-color: rgba(167,139,250,.16);
+  border-color: rgba(255,45,117,.16);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.045), 0 18px 44px rgba(27,18,58,.08);
 }
 
@@ -976,7 +976,7 @@ textarea:focus-visible {  outline: 0;
   bottom: .35rem;
   width: 2px;
   border-radius: 99px;
-  background: linear-gradient(180deg, rgba(167,139,250,.65), rgba(103,232,249,.18), transparent);
+  background: linear-gradient(180deg, rgba(255,45,117,.65), rgba(103,232,249,.18), transparent);
   opacity: .75;
 }
 
@@ -992,7 +992,7 @@ textarea:focus-visible {  outline: 0;
   pointer-events: none;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(115deg, rgba(167,139,250,.22), transparent 32%, rgba(103,232,249,.12), transparent 78%);
+  background: linear-gradient(115deg, rgba(255,45,117,.22), transparent 32%, rgba(103,232,249,.12), transparent 78%);
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
@@ -1062,7 +1062,7 @@ textarea:focus-visible {  outline: 0;
 .sidebar {
   background:
     linear-gradient(180deg, rgba(10,10,15,.94), rgba(8,9,13,.82)),
-    radial-gradient(circle at 30% 15%, rgba(124,92,255,.08), transparent 26rem);
+    radial-gradient(circle at 30% 15%, rgba(233,30,99,.08), transparent 26rem);
   border-right-color: rgba(255,255,255,.065);
 }
 
@@ -1118,7 +1118,7 @@ textarea:focus-visible {  outline: 0;
 .welcome-state .eyebrow {
   margin-top: .8rem;
   letter-spacing: .22em;
-  color: rgba(167,139,250,.78);
+  color: rgba(255,45,117,.78);
 }
 
 .welcome-state h2 {
